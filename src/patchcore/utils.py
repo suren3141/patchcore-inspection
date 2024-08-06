@@ -76,6 +76,35 @@ def plot_segmentation_images(
         f.savefig(savename)
         plt.close()
 
+import json
+
+def save_anomaly_scores(
+    savefolder,
+    image_paths,
+    anomaly_scores=None,
+):
+    """Save anomaly scares.
+
+    Args:
+        image_paths: List[str] List of paths to images.
+        anomaly_scores: [List[float]] Anomaly scores for each image.
+    """
+    if anomaly_scores is None or not any(anomaly_scores):
+        raise NotImplementedError
+
+    os.makedirs(savefolder, exist_ok=True)
+
+    score_dict = {
+        image_path : anomaly_score for image_path, anomaly_score in zip(image_paths, anomaly_scores)
+    }
+
+    with open(os.path.join(savefolder, "scores.json"), "w+") as f:
+        json.dump(score_dict, f, indent=4)
+
+
+
+
+
 
 def create_storage_folder(
     main_folder_path, project_folder, group_folder, mode="iterate"

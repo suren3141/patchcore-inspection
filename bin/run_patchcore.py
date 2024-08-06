@@ -7,6 +7,8 @@ import click
 import numpy as np
 import torch
 
+sys.path.append('./src')
+
 import patchcore.backbones
 import patchcore.common
 import patchcore.metrics
@@ -14,9 +16,13 @@ import patchcore.patchcore
 import patchcore.sampler
 import patchcore.utils
 
+from patchcore.optimus import get_monuseg_dataloader, load_optimus
+
 LOGGER = logging.getLogger(__name__)
 
-_DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"]}
+# TODO : change this
+_DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"], 
+             "monuseg": ["patchcore.datasets.mvtec", "MVTecDataset"]}
 
 
 @click.group(chain=True)
@@ -96,6 +102,23 @@ def run(
                 torch.cuda.empty_cache()
                 PatchCore.fit(dataloaders["training"])
 
+
+            # (Optional) Store PatchCore model for later re-use.
+            # SAVE all patchcores only if mean_threshold is passed?
+            if save_patchcore_model:
+                patchcore_save_path = os.path.join(
+                    run_save_path, "models", dataset_name
+                )
+                os.makedirs(patchcore_save_path, exist_ok=True)
+                for i, PatchCore in enumerate(PatchCore_list):
+                    prepend = (
+                        "Ensemble-{}-{}_".format(i + 1, len(PatchCore_list))
+                        if len(PatchCore_list) > 1
+                        else ""
+                    )
+                    PatchCore.save_to_path(patchcore_save_path, prepend)
+
+            # Evaluation
             torch.cuda.empty_cache()
             aggregator = {"scores": [], "segmentations": []}
             for i, PatchCore in enumerate(PatchCore_list):
@@ -118,25 +141,29 @@ def run(
             scores = np.mean(scores, axis=0)
 
             segmentations = np.array(aggregator["segmentations"])
-            min_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .min(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            max_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .max(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            segmentations = (segmentations - min_scores) / (max_scores - min_scores)
-            segmentations = np.mean(segmentations, axis=0)
+            predicted_segmentation_maps = segmentations.any()
+
+            if predicted_segmentation_maps:
+
+                min_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .min(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                max_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .max(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                segmentations = (segmentations - min_scores) / (max_scores - min_scores)
+                segmentations = np.mean(segmentations, axis=0)
 
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
 
             # (Optional) Plot example images.
-            if save_segmentation_images:
+            if save_segmentation_images and predicted_segmentation_maps:
                 image_paths = [
                     x[2] for x in dataloaders["testing"].dataset.data_to_iterate
                 ]
@@ -168,6 +195,7 @@ def run(
                     image_paths,
                     segmentations,
                     scores,
+                    anomaly_labels,
                     mask_paths,
                     image_transform=image_transform,
                     mask_transform=mask_transform,
@@ -179,21 +207,27 @@ def run(
             )["auroc"]
 
             # Compute PRO score & PW Auroc for all images
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                segmentations, masks_gt
-            )
-            full_pixel_auroc = pixel_scores["auroc"]
+            if len(masks_gt) > 0 and predicted_segmentation_maps:
+                pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+                    segmentations, masks_gt
+                )
+                full_pixel_auroc = pixel_scores["auroc"]
+            else:
+                full_pixel_auroc = np.nan
 
             # Compute PRO score & PW Auroc only images with anomalies
-            sel_idxs = []
-            for i in range(len(masks_gt)):
-                if np.sum(masks_gt[i]) > 0:
-                    sel_idxs.append(i)
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                [segmentations[i] for i in sel_idxs],
-                [masks_gt[i] for i in sel_idxs],
-            )
-            anomaly_pixel_auroc = pixel_scores["auroc"]
+            if len(masks_gt) > 0 and predicted_segmentation_maps:
+                sel_idxs = []
+                for i in range(len(masks_gt)):
+                    if np.sum(masks_gt[i]) > 0:
+                        sel_idxs.append(i)
+                pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+                    [segmentations[i] for i in sel_idxs],
+                    [masks_gt[i] for i in sel_idxs],
+                )
+                anomaly_pixel_auroc = pixel_scores["auroc"]
+            else:
+                anomaly_pixel_auroc = np.nan
 
             result_collect.append(
                 {
@@ -208,20 +242,6 @@ def run(
                 if key != "dataset_name":
                     LOGGER.info("{0}: {1:3.3f}".format(key, item))
 
-            # (Optional) Store PatchCore model for later re-use.
-            # SAVE all patchcores only if mean_threshold is passed?
-            if save_patchcore_model:
-                patchcore_save_path = os.path.join(
-                    run_save_path, "models", dataset_name
-                )
-                os.makedirs(patchcore_save_path, exist_ok=True)
-                for i, PatchCore in enumerate(PatchCore_list):
-                    prepend = (
-                        "Ensemble-{}-{}_".format(i + 1, len(PatchCore_list))
-                        if len(PatchCore_list) > 1
-                        else ""
-                    )
-                    PatchCore.save_to_path(patchcore_save_path, prepend)
 
         LOGGER.info("\n\n-----\n")
 
@@ -291,8 +311,13 @@ def patch_core(
                 backbone_name, backbone_seed = backbone_name.split(".seed-")[0], int(
                     backbone_name.split("-")[-1]
                 )
-            backbone = patchcore.backbones.load(backbone_name)
-            backbone.name, backbone.seed = backbone_name, backbone_seed
+
+            if backbone_name == "optimus":
+                backbone = load_optimus(device=device)
+                backbone.name, backbone.seed = backbone_name, backbone_seed
+            else:
+                backbone = patchcore.backbones.load(backbone_name)
+                backbone.name, backbone.seed = backbone_name, backbone_seed
 
             nn_method = patchcore.common.FaissNN(faiss_on_gpu, faiss_num_workers)
 
@@ -305,6 +330,7 @@ def patch_core(
                 pretrain_embed_dimension=pretrain_embed_dimension,
                 target_embed_dimension=target_embed_dimension,
                 patchsize=patchsize,
+                patchstride=patchsize//2,
                 featuresampler=sampler,
                 anomaly_scorer_num_nn=anomaly_scorer_num_nn,
                 nn_method=nn_method,
@@ -333,7 +359,7 @@ def sampler(name, percentage):
 @main.command("dataset")
 @click.argument("name", type=str)
 @click.argument("data_path", type=click.Path(exists=True, file_okay=False))
-@click.option("--subdatasets", "-d", multiple=True, type=str, required=True)
+@click.option("--subdatasets", "-d", multiple=True, type=str, default=[''], show_default=True)
 @click.option("--train_val_split", type=float, default=1, show_default=True)
 @click.option("--batch_size", default=2, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
@@ -351,72 +377,21 @@ def dataset(
     num_workers,
     augment,
 ):
+
     dataset_info = _DATASETS[name]
     dataset_library = __import__(dataset_info[0], fromlist=[dataset_info[1]])
 
-    def get_dataloaders(seed):
-        dataloaders = []
-        for subdataset in subdatasets:
-            train_dataset = dataset_library.__dict__[dataset_info[1]](
-                data_path,
-                classname=subdataset,
-                resize=resize,
-                train_val_split=train_val_split,
-                imagesize=imagesize,
-                split=dataset_library.DatasetSplit.TRAIN,
-                seed=seed,
-                augment=augment,
-            )
+    if name == "monuseg":
+        def get_dataloaders(seed):
+            dataloaders = []
 
-            test_dataset = dataset_library.__dict__[dataset_info[1]](
-                data_path,
-                classname=subdataset,
-                resize=resize,
-                imagesize=imagesize,
-                split=dataset_library.DatasetSplit.TEST,
-                seed=seed,
-            )
+            train_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize)
+            test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
 
-            train_dataloader = torch.utils.data.DataLoader(
-                train_dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=num_workers,
-                pin_memory=True,
-            )
+            train_dataloader.name = "train"
+            test_dataloader.name = "test"
 
-            test_dataloader = torch.utils.data.DataLoader(
-                test_dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=num_workers,
-                pin_memory=True,
-            )
-
-            train_dataloader.name = name
-            if subdataset is not None:
-                train_dataloader.name += "_" + subdataset
-
-            if train_val_split < 1:
-                val_dataset = dataset_library.__dict__[dataset_info[1]](
-                    data_path,
-                    classname=subdataset,
-                    resize=resize,
-                    train_val_split=train_val_split,
-                    imagesize=imagesize,
-                    split=dataset_library.DatasetSplit.VAL,
-                    seed=seed,
-                )
-
-                val_dataloader = torch.utils.data.DataLoader(
-                    val_dataset,
-                    batch_size=batch_size,
-                    shuffle=False,
-                    num_workers=num_workers,
-                    pin_memory=True,
-                )
-            else:
-                val_dataloader = None
+            val_dataloader = None
             dataloader_dict = {
                 "training": train_dataloader,
                 "validation": val_dataloader,
@@ -424,7 +399,80 @@ def dataset(
             }
 
             dataloaders.append(dataloader_dict)
-        return dataloaders
+            return dataloaders
+
+    else:
+        def get_dataloaders(seed):
+            dataloaders = []
+            for subdataset in subdatasets:
+                train_dataset = dataset_library.__dict__[dataset_info[1]](
+                    data_path,
+                    classname=subdataset,
+                    resize=resize,
+                    train_val_split=train_val_split,
+                    imagesize=imagesize,
+                    split=dataset_library.DatasetSplit.TRAIN,
+                    seed=seed,
+                    augment=augment,
+                )
+
+                test_dataset = dataset_library.__dict__[dataset_info[1]](
+                    data_path,
+                    classname=subdataset,
+                    resize=resize,
+                    imagesize=imagesize,
+                    split=dataset_library.DatasetSplit.TEST,
+                    seed=seed,
+                )
+
+                train_dataloader = torch.utils.data.DataLoader(
+                    train_dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=num_workers,
+                    pin_memory=True,
+                )
+
+                test_dataloader = torch.utils.data.DataLoader(
+                    test_dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=num_workers,
+                    pin_memory=True,
+                )
+
+                train_dataloader.name = name
+                if subdataset is not None:
+                    train_dataloader.name += "_" + subdataset
+
+                if train_val_split < 1:
+                    val_dataset = dataset_library.__dict__[dataset_info[1]](
+                        data_path,
+                        classname=subdataset,
+                        resize=resize,
+                        train_val_split=train_val_split,
+                        imagesize=imagesize,
+                        split=dataset_library.DatasetSplit.VAL,
+                        seed=seed,
+                    )
+
+                    val_dataloader = torch.utils.data.DataLoader(
+                        val_dataset,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=num_workers,
+                        pin_memory=True,
+                    )
+                else:
+                    val_dataloader = None
+                dataloader_dict = {
+                    "training": train_dataloader,
+                    "validation": val_dataloader,
+                    "testing": test_dataloader,
+                }
+
+                dataloaders.append(dataloader_dict)
+            return dataloaders
 
     return ("get_dataloaders", get_dataloaders)
 

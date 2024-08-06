@@ -4,6 +4,7 @@ from enum import Enum
 import PIL
 import torch
 from torchvision import transforms
+from torch.utils.data import DataLoader
 
 from pathlib import Path
 
@@ -52,28 +53,28 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         self.train_val_split = train_val_split
 
         self.img_files = self._get_img_files()
-
         self.data_to_iterate = self._get_data_to_iterate()
 
-        # self.imgpaths_per_class, self.data_to_iterate = self.get_image_data()
+        transform = []
+        if resize != 0:
+            transform.append(transforms.Resize(resize))
+            self.imagesize = (3, resize, resize)
+        if imagesize != 0:
+            transform.append(transforms.CenterCrop(imagesize))
+            self.imagesize = (3, imagesize, imagesize)
 
-        self.transform_img = [
-            transforms.Resize(resize),
-            transforms.CenterCrop(imagesize),
+
+        transform += [
+            # transforms.ToPILImage(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=MoNuSegDataset.transform_mean, std=MoNuSegDataset.transform_std),
+            transforms.Normalize(
+                mean=MoNuSegDataset.transform_mean, 
+                std=MoNuSegDataset.transform_std
+            ),
         ]
-        self.transform_img = transforms.Compose(self.transform_img)
 
-        # self.transform_mask = [
-        #     transforms.Resize(resize),
-        #     transforms.CenterCrop(imagesize),
-        #     transforms.ToTensor(),
-        # ]
-        # self.transform_mask = transforms.Compose(self.transform_mask)
-        self.transform_mask = None
+        self.transform_img = transforms.Compose(transform)
 
-        self.imagesize = (3, imagesize, imagesize)
 
     def _get_img_files(self):
 
@@ -86,6 +87,8 @@ class MoNuSegDataset(torch.utils.data.Dataset):
 
             self.img_files = img_files
 
+    def __len__(self):
+        return len(self.img_files)
 
     def __getitem__(self, idx):
         img_path = self.img_files[idx]
@@ -119,9 +122,6 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         }
         '''
 
-    def __len__(self):
-        return len(self.data_to_iterate)
-
     def _load_img(self, path):
         from PIL import Image
         import numpy as np
@@ -134,14 +134,12 @@ class MoNuSegDataset(torch.utils.data.Dataset):
 
         return pil_image
 
-
     def _get_data_to_iterate(self):
 
         data_to_iterate = []
         for img_name in self.img_files:
             path = Path(img_name)
             classname = path.parent.absolute().stem
-            # TODO : Change this
             anomaly= "good" if classname in ["good", "gt"] else "syn"
             image_path = img_name
             mask_path = None            
@@ -205,3 +203,29 @@ class MoNuSegDataset(torch.utils.data.Dataset):
                     data_to_iterate.append(data_tuple)
 
         return imgpaths_per_class, data_to_iterate
+
+
+def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, resize=256, subsample=.1):
+
+
+    if split == "test":
+        images = []
+        images_syn = glob.glob(os.path.join(data_path, "test/syn/v1.2_*/samples/", "*.png"))
+        images_gt = glob.glob(os.path.join(data_path, "test/gt", "*.png"))
+
+        if subsample:
+            images_syn = list(np.random.choice(images_syn, int(len(images_syn)*subsample), replace=False))
+            images_gt = list(np.random.choice(images_gt, int(len(images_gt)*subsample), replace=False))
+
+        images+= images_syn
+        images+= images_gt
+        
+
+    else:
+        images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
+
+    # TODO : Update this to take in only path (and not images)
+    image_dataset = MoNuSegDataset(images, imagesize=imagesize, resize=resize)
+    dataloader = DataLoader(image_dataset, batch_size=batch_size, shuffle=False)
+
+    return dataloader

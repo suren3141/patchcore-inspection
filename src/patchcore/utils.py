@@ -17,6 +17,7 @@ def plot_segmentation_images(
     image_paths,
     segmentations,
     anomaly_scores=None,
+    anomaly_labels=None,
     mask_paths=None,
     image_transform=lambda x: x,
     mask_transform=lambda x: x,
@@ -33,16 +34,16 @@ def plot_segmentation_images(
         mask_transform: [function or lambda] Optional transformation of masks.
         save_depth: [int] Number of path-strings to use for image savenames.
     """
-    if mask_paths is None:
+    if mask_paths is None or not any(mask_paths):
         mask_paths = ["-1" for _ in range(len(image_paths))]
     masks_provided = mask_paths[0] != "-1"
-    if anomaly_scores is None:
+    if anomaly_scores is None or not any(anomaly_scores):
         anomaly_scores = ["-1" for _ in range(len(image_paths))]
 
-    os.makedirs(savefolder, exist_ok=True)
+    os.makedirs(os.path.join(savefolder, "output_images"), exist_ok=True)
 
-    for image_path, mask_path, anomaly_score, segmentation in tqdm.tqdm(
-        zip(image_paths, mask_paths, anomaly_scores, segmentations),
+    for image_path, mask_path, anomaly_score, anomaly_label, segmentation in tqdm.tqdm(
+        zip(image_paths, mask_paths, anomaly_scores, anomaly_labels, segmentations),
         total=len(image_paths),
         desc="Generating Segmentation Images...",
         leave=False,
@@ -52,23 +53,25 @@ def plot_segmentation_images(
         if not isinstance(image, np.ndarray):
             image = image.numpy()
 
-        if masks_provided:
-            if mask_path is not None:
-                mask = PIL.Image.open(mask_path).convert("RGB")
-                mask = mask_transform(mask)
-                if not isinstance(mask, np.ndarray):
-                    mask = mask.numpy()
-            else:
-                mask = np.zeros_like(image)
+        if masks_provided and mask_path not in [None, "-1"]:
+            mask = PIL.Image.open(mask_path).convert("RGB")
+            mask = mask_transform(mask)
+            if not isinstance(mask, np.ndarray):
+                mask = mask.numpy()
+        else:
+            mask = np.zeros_like(image)
 
         savename = image_path.split("/")
         savename = "_".join(savename[-save_depth:])
         savename = os.path.join(savefolder, savename)
-        f, axes = plt.subplots(1, 2 + int(masks_provided))
+        f, axes = plt.subplots(1, 3)
+        axes[0].set_title(f"anomaly:{anomaly_label}")
         axes[0].imshow(image.transpose(1, 2, 0))
         axes[1].imshow(mask.transpose(1, 2, 0))
+        axes[1].set_title(f"mask:{masks_provided}")
         axes[2].imshow(segmentation)
-        f.set_size_inches(3 * (2 + int(masks_provided)), 3)
+        axes[2].set_title(f"{anomaly_score:.3f}")
+        f.set_size_inches(3 * 3, 3)
         f.tight_layout()
         f.savefig(savename)
         plt.close()

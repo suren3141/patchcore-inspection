@@ -1,6 +1,8 @@
-# Towards Total Recall in Industrial Anomaly Detection
+# Detecting OOD synthetic H&E images
 
-This repository contains the implementation for `PatchCore` as proposed in Roth et al. (2021), <https://arxiv.org/abs/2106.08265>.
+This repository is an extension of `PatchCore` as proposed in Roth et al. (2021), <https://arxiv.org/abs/2106.08265> applied for OOD detection of synthetic histopathological images.
+
+The ReadMe will be updated at the end of the project.
 
 It also provides various pretrained models that can achieve up to _99.6%_ image-level anomaly
 detection AUROC, _98.4%_ pixel-level anomaly localization AUROC and _>95%_ PRO score (although the
@@ -8,7 +10,7 @@ later metric is not included for license reasons).
 
 ![defect_segmentation](images/patchcore_defect_segmentation.png)
 
-_For questions & feedback, please reach out to karsten.rh1@gmail.com!_
+_For questions & feedback, please reach out to suren.sritharan@tum.de_
 
 ---
 
@@ -192,6 +194,8 @@ should look something like:
 
 ### Citing
 
+The original implementation can be found in the [PathCore]() repository here.
+
 If you use the code in this repository, please cite
 
 ```
@@ -205,10 +209,6 @@ If you use the code in this repository, please cite
 }
 ```
 
-## Security
+<!-- ## License
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
-
-## License
-
-This project is licensed under the Apache-2.0 License.
+This project is licensed under the Apache-2.0 License. -->

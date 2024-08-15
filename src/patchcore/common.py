@@ -225,11 +225,22 @@ class NetworkFeatureAggregator(torch.nn.Module):
         self.layers_to_extract_from = layers_to_extract_from
         self.backbone = backbone
         self.device = device
+
         if not hasattr(backbone, "hook_handles"):
             self.backbone.hook_handles = []
         for handle in self.backbone.hook_handles:
             handle.remove()
         self.outputs = {}
+
+        if self.backbone.name == "optimus":
+            # self.backbone.head_drop = torch.nn.Identity()
+            # self.backbone.norm = torch.nn.Identity()
+            self.to(self.device)
+            return
+
+        if self.backbone.name == "medsam":
+            self.to(self.device)
+            return
 
         for extract_layer in layers_to_extract_from:
             forward_hook = ForwardHook(
@@ -257,7 +268,27 @@ class NetworkFeatureAggregator(torch.nn.Module):
         self.to(self.device)
 
     def forward(self, images):
+
         self.outputs.clear()
+
+        if self.backbone.name == "optimus":
+            with torch.inference_mode():
+                features = self.backbone.forward_features(images)
+                # TODO : Can I do this??
+                features = features[:, -256:, :].view(features.shape[0], 16, 16, features.shape[-1])
+                # assert features.shape == (images.shape[0], 1536)
+                self.outputs['out'] = features
+            return self.outputs
+
+        if self.backbone.name == "medsam":
+            with torch.inference_mode():
+                images = self.backbone.preprocess(images)
+                features = self.backbone.image_encoder(images)
+                # assert features.shape == (images.shape[0], 1536)
+                self.outputs['out'] = features
+            return self.outputs
+
+
         with torch.no_grad():
             # The backbone will throw an Exception once it reached the last
             # layer to compute features from. Computation will stop there.

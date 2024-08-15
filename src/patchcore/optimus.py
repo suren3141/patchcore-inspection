@@ -103,6 +103,9 @@ def load_optimus(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.pth",
         ), 
         'act_layer': torch.nn.modules.activation.SiLU, 
         'reg_tokens': 4, 
+        # 'reg_tokens': 0, 
+        # 'class_token': False,
+        # 'global_pool' : '',
         'no_embed_class': True, 
         # 'img_size': 128, 
         'img_size': 224, 
@@ -119,12 +122,14 @@ def load_optimus(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.pth",
     return model_h_optimus
 
 
-def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, resize=256, subsample=.1):
+def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", imagesize=224, resize=256, subsample=.1):
+
+    print(f"{split} dataloader : ")
 
 
     if split == "test":
         images = []
-        images_syn = glob.glob(os.path.join(data_path, "test/syn/v1.2_*/samples/", "*.png"))
+        images_syn = glob.glob(os.path.join(data_path, f"test/syn/{version}_*/samples/", "*.png"))
         images_gt = glob.glob(os.path.join(data_path, "test/gt", "*.png"))
 
         if subsample:
@@ -138,8 +143,12 @@ def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, res
     else:
         images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
 
+
     image_dataset = ImageDataset(images, imagesize=imagesize, resize=resize)
     dataloader = DataLoader(image_dataset, batch_size=batch_size, shuffle=False)
+
+    print(f"\tsample : {subsample}")
+    print(f"\timages : {len(images)}")
 
     return dataloader
 

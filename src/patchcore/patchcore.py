@@ -12,6 +12,7 @@ import patchcore
 import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
+import patchcore.utils 
 
 LOGGER = logging.getLogger(__name__)
 
@@ -266,9 +267,12 @@ class PatchCore(torch.nn.Module):
         LOGGER.info("Loading and initializing PatchCore.")
         with open(self._params_file(load_path, prepend), "rb") as load_file:
             patchcore_params = pickle.load(load_file)
-        patchcore_params["backbone"] = patchcore.backbones.load(
-            patchcore_params["backbone.name"]
-        )
+
+        # patchcore_params["backbone"] = patchcore.backbones.load(
+        #     patchcore_params["backbone.name"]
+        # )
+
+        patchcore_params["backbone"] = patchcore.utils.get_backbone(patchcore_params["backbone.name"])
         patchcore_params["backbone"].name = patchcore_params["backbone.name"]
         del patchcore_params["backbone.name"]
         self.load(**patchcore_params, device=device, nn_method=nn_method)

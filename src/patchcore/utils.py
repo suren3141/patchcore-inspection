@@ -63,7 +63,7 @@ def plot_segmentation_images(
 
         savename = image_path.split("/")
         savename = "_".join(savename[-save_depth:])
-        savename = os.path.join(savefolder, savename)
+        savename = os.path.join(savefolder, "output_images", savename)
         f, axes = plt.subplots(1, 3)
         axes[0].set_title(f"anomaly:{anomaly_label}")
         axes[0].imshow(image.transpose(1, 2, 0))
@@ -95,12 +95,36 @@ def save_anomaly_scores(
     os.makedirs(savefolder, exist_ok=True)
 
     score_dict = {
-        image_path : anomaly_score for image_path, anomaly_score in zip(image_paths, anomaly_scores)
+        image_path : float(anomaly_score) for image_path, anomaly_score in zip(image_paths, anomaly_scores)
     }
 
     with open(os.path.join(savefolder, "scores.json"), "w+") as f:
         json.dump(score_dict, f, indent=4)
 
+def get_backbone(backbone_name, backbone_seed=None):
+
+    if backbone_name == "optimus":
+        from patchcore.optimus import load_optimus
+
+        backbone = load_optimus()
+        backbone.name, backbone.seed = backbone_name, backbone_seed
+    elif backbone_name == "medsam":
+        from segment_anything import SamPredictor, sam_model_registry
+
+        model_weights_path = "/mnt/dataset/medsam/medsam_vit_b.pth"
+        sam = sam_model_registry["vit_b"](checkpoint=model_weights_path)
+        # predictor = SamPredictor(sam)
+        backbone = sam
+        backbone.name, backbone.seed = backbone_name, backbone_seed
+    else:
+        import sys
+        sys.path.append('src/patchcore')
+        import patchcore.backbones
+
+        backbone = patchcore.backbones.load(backbone_name)
+        backbone.name, backbone.seed = backbone_name, backbone_seed
+
+    return backbone
 
 
 
@@ -185,7 +209,23 @@ def compute_and_store_final_results(
         mean_metrics[result_key] = np.mean([x[i] for x in results])
         LOGGER.info("{0}: {1:3.3f}".format(result_key, mean_metrics[result_key]))
 
-    savename = os.path.join(results_path, "results.csv")
+    def get_savename(results_path, mode="iterate"):
+
+        savename = os.path.join(results_path, "results.csv")
+
+        if mode == "iterate":
+            counter = 0
+            while os.path.exists(savename):
+                savename = os.path.join(results_path, f"results_{counter}.csv")
+                counter += 1
+        elif mode == "overwrite":
+            pass
+
+        return savename
+
+    savename = get_savename(results_path)
+    # savename = os.path.join(results_path, "results.csv")
+
     with open(savename, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")
         header = column_names

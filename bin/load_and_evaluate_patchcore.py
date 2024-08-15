@@ -117,6 +117,10 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
             # Save anomaly scores in json.
             if save_anomaly_scores:
 
+                image_paths = [
+                    x[2] for x in dataloaders["testing"].dataset.data_to_iterate
+                ]
+
                 patchcore.utils.save_anomaly_scores(
                     results_path,
                     image_paths,
@@ -182,6 +186,11 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
         column_names=result_metric_names,
         row_names=result_dataset_names,
     )
+
+    # Hyperparameter optimization runs out of memory if not cleared.
+    torch.cuda.empty_cache()
+
+    return result_collect
 
 def get_eval_metrics(scores, anomaly_labels, segmentations, masks_gt, dataset_name):
     # Compute Image-level AUROC scores for all images.
@@ -284,13 +293,15 @@ def dataset(
         def get_dataloaders_iter(seed):
             from patchcore.optimus import get_monuseg_dataloader
 
-            test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
+            for subdataset in subdatasets:
 
-            test_dataloader.name = name
+                test_dataloader = get_monuseg_dataloader(data_path, version=subdataset, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
 
-            dataloader_dict = {"testing": test_dataloader}
+                test_dataloader.name = name
 
-            yield dataloader_dict
+                dataloader_dict = {"testing": test_dataloader}
+
+                yield dataloader_dict
 
     else:
         def get_dataloaders_iter(seed):

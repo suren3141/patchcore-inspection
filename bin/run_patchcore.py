@@ -16,7 +16,7 @@ import patchcore.patchcore
 import patchcore.sampler
 import patchcore.utils
 
-from patchcore.optimus import get_monuseg_dataloader, load_optimus
+from patchcore.optimus import get_monuseg_dataloader
 
 LOGGER = logging.getLogger(__name__)
 
@@ -80,7 +80,6 @@ def run(
         patchcore.utils.fix_seeds(seed, device)
 
         dataset_name = dataloaders["training"].name
-
         with device_context:
             torch.cuda.empty_cache()
             imagesize = dataloaders["training"].dataset.imagesize
@@ -256,6 +255,11 @@ def run(
         row_names=result_dataset_names,
     )
 
+    # Hyperparameter optimization runs out of memory if not cleared.
+    torch.cuda.empty_cache()
+
+    return result_collect
+
 
 @main.command("patch_core")
 # Pretraining-specific parameters.
@@ -312,12 +316,7 @@ def patch_core(
                     backbone_name.split("-")[-1]
                 )
 
-            if backbone_name == "optimus":
-                backbone = load_optimus(device=device)
-                backbone.name, backbone.seed = backbone_name, backbone_seed
-            else:
-                backbone = patchcore.backbones.load(backbone_name)
-                backbone.name, backbone.seed = backbone_name, backbone_seed
+            backbone = patchcore.utils.get_backbone(backbone_name, backbone_seed)
 
             nn_method = patchcore.common.FaissNN(faiss_on_gpu, faiss_num_workers)
 
@@ -385,20 +384,21 @@ def dataset(
         def get_dataloaders(seed):
             dataloaders = []
 
-            train_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize)
-            test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
+            for subdata in subdatasets:
+                train_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize)
+                test_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize, subsample=.1)
 
-            train_dataloader.name = "train"
-            test_dataloader.name = "test"
+                train_dataloader.name = "train"
+                test_dataloader.name = "test"
 
-            val_dataloader = None
-            dataloader_dict = {
-                "training": train_dataloader,
-                "validation": val_dataloader,
-                "testing": test_dataloader,
-            }
+                val_dataloader = None
+                dataloader_dict = {
+                    "training": train_dataloader,
+                    "validation": val_dataloader,
+                    "testing": test_dataloader,
+                }
 
-            dataloaders.append(dataloader_dict)
+                dataloaders.append(dataloader_dict)
             return dataloaders
 
     else:

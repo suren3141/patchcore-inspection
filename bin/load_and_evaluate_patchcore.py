@@ -291,11 +291,11 @@ def dataset(
 
     if name == "monuseg":
         def get_dataloaders_iter(seed):
-            from patchcore.optimus import get_monuseg_dataloader
+            from patchcore.datasets.monuseg import get_monuseg_dataloader
 
             for subdataset in subdatasets:
 
-                test_dataloader = get_monuseg_dataloader(data_path, version=subdataset, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
+                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
 
                 test_dataloader.name = name
 

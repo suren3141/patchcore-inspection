@@ -25,12 +25,18 @@ class MoNuSegDataset(torch.utils.data.Dataset):
     """
 
     # TODO : change this
-    transform_mean=(0.707223, 0.578729, 0.703617)
-    transform_std=(0.211883, 0.230117, 0.177517)
+    # transform_mean=(0.707223, 0.578729, 0.703617)
+    # transform_std=(0.211883, 0.230117, 0.177517)
+
+    # Updated mean, std for monuseg
+    transform_mean=[0.6124, 0.4338, 0.6320]
+    transform_std=[0.1906, 0.2167, 0.1589]
+
 
     def __init__(
         self,
         data_path,
+        norm=True,
         resize=256,
         imagesize=224,
         split=DatasetSplit.TRAIN,
@@ -48,18 +54,25 @@ class MoNuSegDataset(torch.utils.data.Dataset):
                    mvtec.DatasetSplit.TEST will also load mask data.
         """
         super().__init__()
-        self.data_path = data_path
         self.split = split
         self.train_val_split = train_val_split
 
-        self.img_files = self._get_img_files()
+        if isinstance(data_path, str):
+            self.data_path = data_path
+            self.img_files = self._get_img_files()
+
+        elif isinstance(data_path, list):
+            self.data_path = None
+            self.img_files = data_path
+
+        
         self.data_to_iterate = self._get_data_to_iterate()
 
         transform = []
         if resize != 0:
             transform.append(transforms.Resize(resize))
             self.imagesize = (3, resize, resize)
-        if imagesize != 0:
+        if imagesize != 0 and imagesize != resize:
             transform.append(transforms.CenterCrop(imagesize))
             self.imagesize = (3, imagesize, imagesize)
 
@@ -67,16 +80,22 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         transform += [
             # transforms.ToPILImage(),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=MoNuSegDataset.transform_mean, 
-                std=MoNuSegDataset.transform_std
-            ),
         ]
+
+        if norm:
+            transform.append(
+                transforms.Normalize(
+                    mean=MoNuSegDataset.transform_mean, 
+                    std=MoNuSegDataset.transform_std
+                )
+            )
 
         self.transform_img = transforms.Compose(transform)
 
 
     def _get_img_files(self):
+
+        raise NotImplementedError()
 
         par_path = os.path.join(self.data_path, self.split.value)
         data_types = os.listdir(par_path)
@@ -204,23 +223,41 @@ class MoNuSegDataset(torch.utils.data.Dataset):
 
         return imgpaths_per_class, data_to_iterate
 
+import numpy as np
+import time
 
-def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, resize=256, subsample=.1):
+def get_monuseg_images(data_path, directories, subsample=None, verbose=False):
 
+    images = []
 
-    if split == "test":
-        images = []
-        images_syn = glob.glob(os.path.join(data_path, "test/syn/v1.2_*/samples/", "*.png"))
-        images_gt = glob.glob(os.path.join(data_path, "test/gt", "*.png"))
+    for d in directories:
+        images_ = glob.glob(os.path.join(data_path, d, "*.png"))
 
         if subsample:
-            images_syn = list(np.random.choice(images_syn, int(len(images_syn)*subsample), replace=False))
-            images_gt = list(np.random.choice(images_gt, int(len(images_gt)*subsample), replace=False))
+            t = 1000 * time.time() # current time in milliseconds
+            np.random.seed(int(t) % 2**32)
 
-        images+= images_syn
-        images+= images_gt
+            images_ = list(np.random.choice(images_, int(len(images_)*subsample), replace=False))
+
+
+        if verbose: print(d, '->', hash(''.join(images_)))
+
+        images+= images_
+
+    if verbose: print('->', hash(''.join(images)))
+
+    return images
+
+
+
+def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, resize=256, subsample=None):
+
+    if split == "test":
+
+        data_dirs = ["test/gt", "test/syn/v1.2_*/samples/", "test/syn/v1.3_*/samples/"]
+
+        images = get_monuseg_images(data_path, data_dirs, subsample=subsample)
         
-
     else:
         images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
 

@@ -242,6 +242,10 @@ class NetworkFeatureAggregator(torch.nn.Module):
             self.to(self.device)
             return
 
+        if self.backbone.name == "inception_v3":
+            self.to(self.device)
+            return
+
         for extract_layer in layers_to_extract_from:
             forward_hook = ForwardHook(
                 self.outputs, extract_layer, layers_to_extract_from[-1]
@@ -288,6 +292,16 @@ class NetworkFeatureAggregator(torch.nn.Module):
                 self.outputs['out'] = features
             return self.outputs
 
+        if self.backbone.name == "inception_v3":
+            with torch.inference_mode():
+                batch = images.to(self.device)
+
+                with torch.no_grad():
+                    pred = self.backbone(batch)[0]
+
+                #TODO : Choose adaptive average pooling or not
+                self.outputs['out'] = pred
+            return self.outputs
 
         with torch.no_grad():
             # The backbone will throw an Exception once it reached the last

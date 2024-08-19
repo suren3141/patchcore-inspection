@@ -385,7 +385,7 @@ def dataset(
             dataloaders = []
 
             for subdata in subdatasets:
-                train_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize)
+                train_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize, subsample=None)
                 test_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize, subsample=.1)
 
                 train_dataloader.name = "train"

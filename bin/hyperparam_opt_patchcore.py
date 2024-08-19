@@ -202,8 +202,9 @@ if __name__ == "__main__":
     # test_hyperparam(default_params)
 
     search_space = dict(
-        sampler_percentage = tune.grid_search([1e-4, 1e-3, 1e-2]),
-        patchcore_patchsize = tune.choice([9, 15, 19]),
+        sampler_percentage = tune.grid_search([1e-2]),
+        # patchcore_patchsize = tune.choice([9, 15, 19]),
+        patchcore_patchsize = tune.choice([7]),
     )
 
 
@@ -221,7 +222,7 @@ if __name__ == "__main__":
         param_space=search_space,
         tune_config=tune.TuneConfig(
             max_concurrent_trials=1,
-            num_samples=100,
+            num_samples=10,
         ),
         run_config=train.RunConfig(
                 # storage_path=os.path.expanduser("~/ray_results"),

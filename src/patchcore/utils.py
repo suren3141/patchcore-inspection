@@ -116,6 +116,10 @@ def get_backbone(backbone_name, backbone_seed=None):
         # predictor = SamPredictor(sam)
         backbone = sam
         backbone.name, backbone.seed = backbone_name, backbone_seed
+    elif backbone_name == "inception_v3":
+        from pytorch_fid.inception import InceptionV3
+        backbone = InceptionV3()
+        backbone.name, backbone.seed = backbone_name, backbone_seed
     else:
         import sys
         sys.path.append('src/patchcore')
@@ -225,6 +229,8 @@ def compute_and_store_final_results(
 
     savename = get_savename(results_path)
     # savename = os.path.join(results_path, "results.csv")
+
+    print(f"saving results : {savename}")
 
     with open(savename, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",")

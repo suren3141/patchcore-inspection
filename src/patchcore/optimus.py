@@ -1,5 +1,6 @@
 import timm
 import functools
+import time
 
 
 # Install from https://github.com/facebookresearch/segment-anything
@@ -122,7 +123,7 @@ def load_optimus(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.pth",
     return model_h_optimus
 
 
-def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", imagesize=224, resize=256, subsample=.1):
+def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", imagesize=224, resize=256, subsample=None):
 
     print(f"{split} dataloader : ")
 
@@ -131,10 +132,17 @@ def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", im
         images = []
         images_syn = glob.glob(os.path.join(data_path, f"test/syn/{version}_*/samples/", "*.png"))
         images_gt = glob.glob(os.path.join(data_path, "test/gt", "*.png"))
+        subsample = .1
 
         if subsample:
+            t = 1000 * time.time() # current time in milliseconds
+            np.random.seed(int(t) % 2**32)
+
             images_syn = list(np.random.choice(images_syn, int(len(images_syn)*subsample), replace=False))
             images_gt = list(np.random.choice(images_gt, int(len(images_gt)*subsample), replace=False))
+
+            print(hash(''.join(images_syn)))
+            print(hash(''.join(images_gt)))
 
         images+= images_syn
         images+= images_gt
@@ -142,6 +150,8 @@ def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", im
 
     else:
         images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
+
+    print(hash(''.join(images)))
 
 
     image_dataset = ImageDataset(images, imagesize=imagesize, resize=resize)

@@ -18,6 +18,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
+'''
 class ImageDataset(Dataset):
 
     transform_mean=(0.707223, 0.578729, 0.703617)
@@ -88,6 +89,8 @@ class ImageDataset(Dataset):
 
         return pil_image
 
+'''
+
 from torch.utils.data import DataLoader
 import glob, os
 
@@ -122,7 +125,7 @@ def load_optimus(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.pth",
 
     return model_h_optimus
 
-
+'''
 def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", imagesize=224, resize=256, subsample=None):
 
     print(f"{split} dataloader : ")
@@ -132,7 +135,6 @@ def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", im
         images = []
         images_syn = glob.glob(os.path.join(data_path, f"test/syn/{version}_*/samples/", "*.png"))
         images_gt = glob.glob(os.path.join(data_path, "test/gt", "*.png"))
-        subsample = .1
 
         if subsample:
             t = 1000 * time.time() # current time in milliseconds
@@ -161,7 +163,7 @@ def get_monuseg_dataloader(data_path, version="v1.2", batch_size=1, split="", im
     print(f"\timages : {len(images)}")
 
     return dataloader
-
+'''
 
 
 

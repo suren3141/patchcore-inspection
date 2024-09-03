@@ -9,6 +9,8 @@ import torch
 
 sys.path.append('./src')
 
+import feature_extractor.utils
+
 import patchcore.backbones
 import patchcore.common
 import patchcore.metrics
@@ -316,7 +318,7 @@ def patch_core(
                     backbone_name.split("-")[-1]
                 )
 
-            backbone = patchcore.utils.get_backbone(backbone_name, backbone_seed)
+            backbone = feature_extractor.utils.get_backbone(backbone_name, backbone_seed)
 
             nn_method = patchcore.common.FaissNN(faiss_on_gpu, faiss_num_workers)
 

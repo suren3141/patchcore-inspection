@@ -8,6 +8,11 @@ import torch
 import torch.nn.functional as F
 import tqdm
 
+import sys
+sys.path.append('./src')
+
+import feature_extractor.utils
+
 import patchcore
 import patchcore.backbones
 import patchcore.common
@@ -272,7 +277,7 @@ class PatchCore(torch.nn.Module):
         #     patchcore_params["backbone.name"]
         # )
 
-        patchcore_params["backbone"] = patchcore.utils.get_backbone(patchcore_params["backbone.name"])
+        patchcore_params["backbone"] = feature_extractor.utils.get_backbone(patchcore_params["backbone.name"])
         patchcore_params["backbone"].name = patchcore_params["backbone.name"]
         del patchcore_params["backbone.name"]
         self.load(**patchcore_params, device=device, nn_method=nn_method)

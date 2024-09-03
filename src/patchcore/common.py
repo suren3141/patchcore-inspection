@@ -277,15 +277,16 @@ class NetworkFeatureAggregator(torch.nn.Module):
 
         if self.backbone.name == "optimus":
             with torch.inference_mode():
-                features = self.backbone.forward_features(images)
+                features = self.backbone._process_input(images)
                 # TODO : Can I do this??
-                features = features[:, -256:, :].view(features.shape[0], 16, 16, features.shape[-1])
+                # features = features[:, -256:, :].view(features.shape[0], 16, 16, features.shape[-1])
                 # assert features.shape == (images.shape[0], 1536)
                 self.outputs['out'] = features
             return self.outputs
 
         if self.backbone.name == "medsam":
             with torch.inference_mode():
+                # TODO : Update preporcess to remove normalization
                 images = self.backbone.preprocess(images)
                 features = self.backbone.image_encoder(images)
                 # assert features.shape == (images.shape[0], 1536)
@@ -294,10 +295,7 @@ class NetworkFeatureAggregator(torch.nn.Module):
 
         if self.backbone.name == "inception_v3":
             with torch.inference_mode():
-                batch = images.to(self.device)
-
-                with torch.no_grad():
-                    pred = self.backbone(batch)[0]
+                pred = self.backbone(images)[0]
 
                 #TODO : Choose adaptive average pooling or not
                 self.outputs['out'] = pred

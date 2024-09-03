@@ -9,9 +9,6 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
-
 
 class DatasetSplit(Enum):
     TRAIN = "train"
@@ -29,8 +26,11 @@ class MoNuSegDataset(torch.utils.data.Dataset):
     # transform_std=(0.211883, 0.230117, 0.177517)
 
     # Updated mean, std for monuseg
-    transform_mean=[0.6124, 0.4338, 0.6320]
-    transform_std=[0.1906, 0.2167, 0.1589]
+    # transform_mean=[0.6910, 0.4947, 0.6422]
+    # transform_std=[0.1662, 0.1828, 0.1421]
+
+    transform_mean= [0.6444, 0.4477, 0.6041]
+    transform_std = [0.1820, 0.1836, 0.1473]
 
 
     def __init__(
@@ -38,7 +38,7 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         data_path,
         norm=True,
         resize=256,
-        imagesize=224,
+        cropsize=224,
         split=DatasetSplit.TRAIN,
         train_val_split=1.0,
         **kwargs,
@@ -47,7 +47,7 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         Args:
             data_path: [str]. Path to the MoNuSeg data folder.
             resize: [int]. (Square) Size the loaded image initially gets resized to.
-            imagesize: [int]. (Square) Size the resized loaded image gets (center-)cropped to.
+            cropsize: [int]. (Square) Size the resized loaded image gets (center-)cropped to.
             split: [enum-option]. Indicates if training or test split of the
                    data should be used. Has to be an option taken from
                    DatasetSplit, e.g. mvtec.DatasetSplit.TRAIN. Note that
@@ -72,9 +72,9 @@ class MoNuSegDataset(torch.utils.data.Dataset):
         if resize != 0:
             transform.append(transforms.Resize(resize))
             self.imagesize = (3, resize, resize)
-        if imagesize != 0 and imagesize != resize:
-            transform.append(transforms.CenterCrop(imagesize))
-            self.imagesize = (3, imagesize, imagesize)
+        if cropsize != 0 and cropsize != resize:
+            transform.append(transforms.CenterCrop(cropsize))
+            self.imagesize = (3, cropsize, cropsize)
 
 
         transform += [
@@ -250,7 +250,7 @@ def get_monuseg_images(data_path, directories, subsample=None, verbose=False):
 
 
 
-def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, resize=256, subsample=None):
+def get_monuseg_dataloader(data_path, batch_size=1, split="", cropsize=224, resize=256, subsample=None):
 
     if split == "test":
 
@@ -262,7 +262,7 @@ def get_monuseg_dataloader(data_path, batch_size=1, split="", imagesize=224, res
         images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
 
     # TODO : Update this to take in only path (and not images)
-    image_dataset = MoNuSegDataset(images, imagesize=imagesize, resize=resize)
+    image_dataset = MoNuSegDataset(images, cropsize=cropsize, resize=resize)
     dataloader = DataLoader(image_dataset, batch_size=batch_size, shuffle=False)
 
     return dataloader

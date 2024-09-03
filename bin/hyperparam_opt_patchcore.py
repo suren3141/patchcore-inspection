@@ -51,7 +51,6 @@ def objective(config, default_params=None):
 
     out_path = os.path.join(params["run_params"]["results_path"], params["run_params"]["log_project"], params["run_params"]["log_group"])
     if os.path.exists(os.path.join(out_path, "models")):
-
         results = params_to_config_eval(params)
     else:
         results = params_to_config_train(params)
@@ -100,6 +99,7 @@ def params_to_config_eval(params):
 
     # Dataset params updated for eval
     dataset_params = {k:v for k, v in params["dataset_params"].items() if k != "train_val_split"}
+    dataset_params['subsample'] = .1
     k, v = dataset.callback(**dataset_params)
     config["methods"].append((k, v))
 
@@ -179,7 +179,7 @@ def get_default_params():
         seed = 0,
         # log_group = "IM224_SAM_P01_D1024-1024_PS-5_ST-2_AN-1_S0",
         log_group = "temp",
-        log_project = "monuseg_hyperparam",
+        log_project = "monuseg_hyperparam_v1.1",
         save_segmentation_images = False,
         save_patchcore_model = True,
         methods = [],
@@ -202,9 +202,9 @@ if __name__ == "__main__":
     # test_hyperparam(default_params)
 
     search_space = dict(
-        sampler_percentage = tune.grid_search([1e-2]),
-        # patchcore_patchsize = tune.choice([9, 15, 19]),
-        patchcore_patchsize = tune.choice([7]),
+        sampler_percentage = tune.grid_search([1e-3]),
+        patchcore_patchsize = tune.choice([7, 9, 11, 15]),
+        # patchcore_patchsize = tune.choice([7]),
     )
 
 

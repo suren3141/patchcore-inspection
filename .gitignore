@@ -4,3 +4,4 @@ LabletAnomaly.egg-info/
 
 results
 monuseg
+src/feature_extractor/optimus.py

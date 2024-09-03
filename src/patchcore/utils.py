@@ -101,38 +101,6 @@ def save_anomaly_scores(
     with open(os.path.join(savefolder, "scores.json"), "w+") as f:
         json.dump(score_dict, f, indent=4)
 
-def get_backbone(backbone_name, backbone_seed=None):
-
-    if backbone_name == "optimus":
-        from patchcore.optimus import load_optimus
-
-        backbone = load_optimus()
-        backbone.name, backbone.seed = backbone_name, backbone_seed
-    elif backbone_name == "medsam":
-        from segment_anything import SamPredictor, sam_model_registry
-
-        model_weights_path = "/mnt/dataset/medsam/medsam_vit_b.pth"
-        sam = sam_model_registry["vit_b"](checkpoint=model_weights_path)
-        # predictor = SamPredictor(sam)
-        backbone = sam
-        backbone.name, backbone.seed = backbone_name, backbone_seed
-    elif backbone_name == "inception_v3":
-        from pytorch_fid.inception import InceptionV3
-        backbone = InceptionV3()
-        backbone.name, backbone.seed = backbone_name, backbone_seed
-    else:
-        import sys
-        sys.path.append('src/patchcore')
-        import patchcore.backbones
-
-        backbone = patchcore.backbones.load(backbone_name)
-        backbone.name, backbone.seed = backbone_name, backbone_seed
-
-    return backbone
-
-
-
-
 
 def create_storage_folder(
     main_folder_path, project_folder, group_folder, mode="iterate"

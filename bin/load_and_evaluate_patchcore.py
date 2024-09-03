@@ -278,13 +278,14 @@ def patch_core_loader(patch_core_paths, faiss_on_gpu, faiss_num_workers):
 @click.argument("name", type=str)
 @click.argument("data_path", type=click.Path(exists=True, file_okay=False))
 @click.option("--subdatasets", "-d", multiple=True, type=str, required=True)
+@click.option("--subsample", type=float, required=False)
 @click.option("--batch_size", default=1, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
 @click.option("--resize", default=256, type=int, show_default=True)
 @click.option("--imagesize", default=224, type=int, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
-    name, data_path, subdatasets, batch_size, resize, imagesize, num_workers, augment
+    name, data_path, subdatasets, subsample, batch_size, resize, imagesize, num_workers, augment
 ):
     dataset_info = _DATASETS[name]
     dataset_library = __import__(dataset_info[0], fromlist=[dataset_info[1]])
@@ -295,7 +296,7 @@ def dataset(
 
             for subdataset in subdatasets:
 
-                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize)
+                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize, subsample=subsample)
 
                 test_dataloader.name = name
 

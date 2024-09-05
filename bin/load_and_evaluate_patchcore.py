@@ -296,7 +296,7 @@ def dataset(
 
             for subdataset in subdatasets:
 
-                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize, subsample=subsample)
+                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, cropsize=imagesize, subsample=subsample)
 
                 test_dataloader.name = name
 

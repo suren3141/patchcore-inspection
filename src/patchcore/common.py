@@ -232,7 +232,7 @@ class NetworkFeatureAggregator(torch.nn.Module):
             handle.remove()
         self.outputs = {}
 
-        if self.backbone.name == "optimus":
+        if self.backbone.name in "optimus":
             # self.backbone.head_drop = torch.nn.Identity()
             # self.backbone.norm = torch.nn.Identity()
             self.to(self.device)
@@ -277,9 +277,10 @@ class NetworkFeatureAggregator(torch.nn.Module):
 
         if self.backbone.name == "optimus":
             with torch.inference_mode():
-                features = self.backbone._process_input(images)
-                # TODO : Can I do this??
-                # features = features[:, -256:, :].view(features.shape[0], 16, 16, features.shape[-1])
+                if hasattr(self.backbone, '_process_input'):    # optimus patch features
+                    features = self.backbone._process_input(images)
+                elif hasattr(self.backbone, 'forward'):    # optimus decoded features
+                    features = self.backbone(images)
                 # assert features.shape == (images.shape[0], 1536)
                 self.outputs['out'] = features
             return self.outputs

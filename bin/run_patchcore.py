@@ -18,8 +18,6 @@ import patchcore.patchcore
 import patchcore.sampler
 import patchcore.utils
 
-from patchcore.optimus import get_monuseg_dataloader
-
 LOGGER = logging.getLogger(__name__)
 
 # TODO : change this
@@ -383,12 +381,14 @@ def dataset(
     dataset_library = __import__(dataset_info[0], fromlist=[dataset_info[1]])
 
     if name == "monuseg":
+        from patchcore.datasets.monuseg import get_monuseg_dataloader
+
         def get_dataloaders(seed):
             dataloaders = []
 
             for subdata in subdatasets:
-                train_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, imagesize=imagesize, subsample=None)
-                test_dataloader = get_monuseg_dataloader(data_path, version=subdata, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, imagesize=imagesize, subsample=.1)
+                train_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TRAIN.value, resize=resize, cropsize=imagesize, subsample=None)
+                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, cropsize=imagesize, subsample=.1)
 
                 train_dataloader.name = "train"
                 test_dataloader.name = "test"

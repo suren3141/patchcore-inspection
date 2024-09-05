@@ -4,8 +4,9 @@ sys.path.append('./src')
 from patchcore.common import NetworkFeatureAggregator
 from patchcore.datasets.monuseg import get_monuseg_images, MoNuSegDataset
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from torch.utils.data import DataLoader
+import tracemalloc
 
 import numpy as np
 import torch
@@ -13,10 +14,15 @@ import torch
 def get_backbone(backbone_name, backbone_seed=None):
 
     if backbone_name == "optimus":
-        from patchcore.optimus import load_optimus
+        from feature_extractor.optimus import load_optimus
 
         backbone = load_optimus()
         backbone.name, backbone.seed = backbone_name, backbone_seed
+    elif backbone_name == "optimus_old":
+        from feature_extractor.optimus import load_optimus_old
+
+        backbone = load_optimus_old()
+        backbone.name, backbone.seed = "optimus", backbone_seed
     elif backbone_name == "medsam":
         from segment_anything import SamPredictor, sam_model_registry
         from types import MethodType
@@ -69,14 +75,14 @@ def get_backbone(backbone_name, backbone_seed=None):
 
     return backbone
 
-def extract_features(images, backbone_name, device, layers=["out"], batch_size=2, num_workers=1, norm=True):
+def extract_features(images, backbone_name, device, layers=["out"], batch_size=2, num_workers=1, norm=True, flat=True):
 
     # assert backbone_name in ['optimus', 'medsam', 'inception_v3']
     # assert 'out' in layers
 
     # norm = backbone_name in ["medsam"]
 
-    if backbone_name == "optimus":
+    if backbone_name in ["optimus", "optimus_old"]:
         resize = 224
     else:
         resize = 0
@@ -92,19 +98,38 @@ def extract_features(images, backbone_name, device, layers=["out"], batch_size=2
 
     feature_aggregator = NetworkFeatureAggregator(backbone, layers, device)
 
+    # Start tracing memory allocation
+    tracemalloc.start()
     features = []
-    for image in tqdm(dataloader, desc='computing features'):
-        if isinstance(image, dict):
-            image = image["image"]
-        with torch.no_grad():
-            input_image = image.to(torch.float).to(device)
 
-            feat = feature_aggregator(input_image)
-            feat = [feat[layer] for layer in layers]
-            feat = [x.detach().cpu().numpy() for x in feat]
-            # print(len(feat), feat[0].shape)
+    print("Computing features...")
+    with tqdm(total=len(dataloader), desc='Computing features') as pbar:
+        for image in dataloader:
+            if isinstance(image, dict):
+                image = image["image"]
+            with torch.no_grad():
+                input_image = image.to(torch.float).to(device)
 
-            features.append(feat)
+                feat = feature_aggregator(input_image)
+                feat = [feat[layer] for layer in layers]
+                feat = [x.detach().cpu().numpy() for x in feat]
+                if flat:
+                    # TODO : Do I need to squeeze here?
+                    # feat = [x.squeeze() for x in feat]
+                    # get mean if patch_feature instead of img_feature
+                    feat = [np.mean(x, axis=(-1, -2)) if x.ndim != 2 else x for x in feat]
+
+                    # print(feat[0].shape)
+
+                # print(len(feat), feat[0].shape)
+
+                features.append(feat)
+
+                current, peak = tracemalloc.get_traced_memory()
+
+                # Update the custom tqdm bar to display memory usage
+                pbar.set_description(f'Memory Usage: {current / 10**6:.2f} MB')
+                pbar.update(1)
 
     out = {}
     for ind, l in enumerate(layers):

@@ -12,6 +12,7 @@ ray.init(
 
 from ray import train, tune
 from functools import partial
+from pprint import pprint
 
 import os, sys
 module_path = "/workspace/patchcore-inspection/src"
@@ -47,9 +48,11 @@ def objective(config, default_params=None):
 
     params["sampler_params"]["percentage"] = percentage
     params["patchcore_params"]["patchsize"] = ps
-    params["run_params"]["log_group"] = f"IM224_SAM_P{percentage:.1e}_D1024-1024_PS-{ps}_AN-1_S0"
+    params["run_params"]["log_group"] = f"IM224_OPT_P{percentage:.1e}_D1024-1024_PS-{ps}_AN-1_S0"
 
     out_path = os.path.join(params["run_params"]["results_path"], params["run_params"]["log_project"], params["run_params"]["log_group"])
+    print(out_path)
+    pprint(params)
     if os.path.exists(os.path.join(out_path, "models")):
         results = params_to_config_eval(params)
     else:
@@ -93,7 +96,7 @@ def params_to_config_eval(params):
         gpu = params["run_params"]["gpu"],
         seed = params["run_params"]["seed"],
         save_segmentation_images = False,
-        save_anomaly_scores = False,
+        save_anomaly_scores = True,
         methods = [],
     )
 
@@ -137,7 +140,7 @@ def test_hyperparam(default_params):
 def get_default_params():
 
     patchcore_params = dict(
-        backbone_names=["medsam"],
+        backbone_names=["optimus"],
         layers_to_extract_from=["out"],
         # Parameters for Glue-code (to merge different parts of the pipeline.
         pretrain_embed_dimension=1024,
@@ -203,7 +206,7 @@ if __name__ == "__main__":
 
     search_space = dict(
         sampler_percentage = tune.grid_search([1e-3]),
-        patchcore_patchsize = tune.choice([7, 9, 11, 15]),
+        patchcore_patchsize = tune.choice([11, 5, 19]),
         # patchcore_patchsize = tune.choice([7]),
     )
 

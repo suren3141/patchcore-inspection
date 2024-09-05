@@ -4,7 +4,8 @@ This repository is an extension of `PatchCore` as proposed in Roth et al. (2021)
 
 The ReadMe will be updated at the end of the project.
 
-It also provides various pretrained models that can achieve up to _99.6%_ image-level anomaly
+
+<!-- It also provides various pretrained models that can achieve up to _99.6%_ image-level anomaly
 detection AUROC, _98.4%_ pixel-level anomaly localization AUROC and _>95%_ PRO score (although the
 later metric is not included for license reasons).
 
@@ -207,7 +208,7 @@ If you use the code in this repository, please cite
       archivePrefix={arXiv},
       primaryClass={cs.CV}
 }
-```
+``` -->
 
 <!-- ## License
 

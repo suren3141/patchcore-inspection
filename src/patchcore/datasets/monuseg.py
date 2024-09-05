@@ -65,6 +65,9 @@ class MoNuSegDataset(torch.utils.data.Dataset):
             self.data_path = None
             self.img_files = data_path
 
+        else:
+            raise NotImplementedError
+
         
         self.data_to_iterate = self._get_data_to_iterate()
 

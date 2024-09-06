@@ -2,47 +2,59 @@ import sys
 sys.path.append('./src')
 
 from patchcore.common import NetworkFeatureAggregator
-from patchcore.datasets.monuseg import get_monuseg_images, MoNuSegDataset
+from patchcore.datasets.monuseg import MoNuSegDataset
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import tracemalloc
 
+from collections import defaultdict
 import numpy as np
 import torch
+from typing import List
+
+def get_optimus_backbone(seed):
+    from feature_extractor.optimus import load_optimus
+
+    backbone = load_optimus()
+    backbone.name, backbone.seed = "optimus", seed
+
+    return backbone
+
+def get_medsam_backbone(seed, model_weights_path = "/mnt/dataset/medsam/medsam_vit_b.pth"):
+    from segment_anything import sam_model_registry
+    from types import MethodType
+
+    sam = sam_model_registry["vit_b"](checkpoint=model_weights_path)
+    # predictor = SamPredictor(sam)
+    backbone = sam
+    backbone.name, backbone.seed = "medsam", seed
+
+    def _preprocess(self, x):
+        # Removed normalize from SAM preprocess since data is already normalized
+        from torch.nn import functional as F
+        h, w = x.shape[-2:]
+        padh = self.image_encoder.img_size - h
+        padw = self.image_encoder.img_size - w
+        x = F.pad(x, (0, padw, 0, padh))
+        return x            
+    
+    backbone.preprocess = MethodType(_preprocess, backbone)
+
+    return backbone
+
 
 def get_backbone(backbone_name, backbone_seed=None):
 
     if backbone_name == "optimus":
-        from feature_extractor.optimus import load_optimus
-
-        backbone = load_optimus()
-        backbone.name, backbone.seed = backbone_name, backbone_seed
+        backbone = get_optimus_backbone(backbone_seed)
     elif backbone_name == "optimus_old":
         from feature_extractor.optimus import load_optimus_old
 
         backbone = load_optimus_old()
         backbone.name, backbone.seed = "optimus", backbone_seed
     elif backbone_name == "medsam":
-        from segment_anything import SamPredictor, sam_model_registry
-        from types import MethodType
-
-        model_weights_path = "/mnt/dataset/medsam/medsam_vit_b.pth"
-        sam = sam_model_registry["vit_b"](checkpoint=model_weights_path)
-        # predictor = SamPredictor(sam)
-        backbone = sam
-        backbone.name, backbone.seed = backbone_name, backbone_seed
-
-        def _preprocess(self, x):
-            # Removed normalize from SAM preprocess since data is already normalized
-            from torch.nn import functional as F
-            h, w = x.shape[-2:]
-            padh = self.image_encoder.img_size - h
-            padw = self.image_encoder.img_size - w
-            x = F.pad(x, (0, padw, 0, padh))
-            return x            
-        
-        backbone.preprocess = MethodType(_preprocess, backbone)
+        backbone = get_medsam_backbone(backbone_seed)
 
     elif backbone_name == "inception_v3":
         from pytorch_fid.inception import InceptionV3
@@ -75,7 +87,50 @@ def get_backbone(backbone_name, backbone_seed=None):
 
     return backbone
 
-def extract_features(images, backbone_name, device, layers=["out"], batch_size=2, num_workers=1, norm=True, flat=True):
+def compute_features(dataloader, feature_aggregator, layers, device, flat=True):
+    # Start tracing memory allocation
+    tracemalloc.start()
+
+    features_dict = defaultdict(list)
+
+    with tqdm(total=len(dataloader), desc='Computing features') as pbar:
+        for image in dataloader:
+            if isinstance(image, dict):
+                image = image["image"]
+
+            with torch.no_grad():
+                input_image = image.to(torch.float).to(device)
+
+                feat = feature_aggregator(input_image)
+                for layer in layers:
+                    feat_layer = feat[layer].detach().cpu().numpy()
+                    # TODO : Do I need to squeeze here?
+                    # feat_layer = feat_layer.squeeze()
+                    if flat and feat_layer.ndim != 2:
+                        feat_layer = np.mean(feat_layer, axis=(-1, -2))
+
+                    features_dict[layer].append(feat_layer)
+
+                current, peak = tracemalloc.get_traced_memory()
+
+                # Update the custom tqdm bar to display memory usage
+                pbar.set_description(f'Memory Usage: {current / 10**6:.2f} MB')
+                pbar.update(1)
+
+    for layer in layers:
+        features_dict[layer] = np.concatenate(features_dict[layer], axis=0)
+
+
+def extract_features(
+    images : List,
+    backbone_name : str,
+    device,
+    layers : List = ["out"], 
+    batch_size : int = 2, 
+    num_workers : int = 1, 
+    norm : bool = True, 
+    flat : bool =True
+    ):
 
     # assert backbone_name in ['optimus', 'medsam', 'inception_v3']
     # assert 'out' in layers
@@ -98,41 +153,9 @@ def extract_features(images, backbone_name, device, layers=["out"], batch_size=2
 
     feature_aggregator = NetworkFeatureAggregator(backbone, layers, device)
 
-    # Start tracing memory allocation
-    tracemalloc.start()
-    features = []
-
     print("Computing features...")
-    with tqdm(total=len(dataloader), desc='Computing features') as pbar:
-        for image in dataloader:
-            if isinstance(image, dict):
-                image = image["image"]
-            with torch.no_grad():
-                input_image = image.to(torch.float).to(device)
+    features_dict = compute_features(dataloader, feature_aggregator, layers, device, flat=flat)
 
-                feat = feature_aggregator(input_image)
-                feat = [feat[layer] for layer in layers]
-                feat = [x.detach().cpu().numpy() for x in feat]
-                if flat:
-                    # TODO : Do I need to squeeze here?
-                    # feat = [x.squeeze() for x in feat]
-                    # get mean if patch_feature instead of img_feature
-                    feat = [np.mean(x, axis=(-1, -2)) if x.ndim != 2 else x for x in feat]
 
-                    # print(feat[0].shape)
 
-                # print(len(feat), feat[0].shape)
-
-                features.append(feat)
-
-                current, peak = tracemalloc.get_traced_memory()
-
-                # Update the custom tqdm bar to display memory usage
-                pbar.set_description(f'Memory Usage: {current / 10**6:.2f} MB')
-                pbar.update(1)
-
-    out = {}
-    for ind, l in enumerate(layers):
-        out[l] = np.concatenate([f[ind] for f in features], axis=0)
-
-    return out
+    return features_dict

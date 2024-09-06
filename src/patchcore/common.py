@@ -279,8 +279,10 @@ class NetworkFeatureAggregator(torch.nn.Module):
             with torch.inference_mode():
                 if hasattr(self.backbone, '_process_input'):    # optimus patch features
                     features = self.backbone._process_input(images)
-                elif hasattr(self.backbone, 'forward'):    # optimus decoded features
-                    features = self.backbone(images)
+                elif hasattr(self.backbone, 'forward_features'):    # optimus decoded features
+                    features = self.backbone.forward_features(images).mean(axis=1)
+                else:
+                    raise NotADirectoryError
                 # assert features.shape == (images.shape[0], 1536)
                 self.outputs['out'] = features
             return self.outputs

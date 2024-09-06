@@ -228,8 +228,9 @@ class MoNuSegDataset(torch.utils.data.Dataset):
 
 import numpy as np
 import time
+from typing import List
 
-def get_monuseg_images(data_path, directories, subsample=None, verbose=False):
+def get_monuseg_images(data_path : str, directories : List, subsample=None, verbose=False):
 
     images = []
 

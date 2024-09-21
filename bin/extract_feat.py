@@ -9,6 +9,7 @@ from feature_extractor.utils import extract_features
 import json, os
 import numpy as np
 import torch
+from glob import glob
 
 if __name__ == "__main__":
 
@@ -19,10 +20,26 @@ if __name__ == "__main__":
 
     layer = "out"
 
+    syn_dirs = [
+        "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_model_*/samples"
+        "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_train_model_*/samples"
+        "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_train_shuffle_model_*/samples"        
+    ]
+
+    syn_dir_list = []
+    for k in syn_dirs:
+        lis = glob(k)
+        print(lis)
+
     input_output_map = {
         "/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTrainingData/images" : f"/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTrainingData/images_feat_{backbone}.json",
         "/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTest/images" : f"/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTest/images_feat_{backbone}.json",
         "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/v1.3*/images" : "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/v1.3_feat_{backbone}.json"
+    }
+
+
+    input_output_map = {
+        "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_model_s1.2_020000/"
     }
 
     for (data_dir, out_json) in input_output_map.items():

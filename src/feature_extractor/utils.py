@@ -1,5 +1,9 @@
+from pathlib import Path
+file_path =  Path(__file__).absolute()
+src_dir = file_path.parents[1]
+
 import sys
-sys.path.append('./src')
+sys.path.append(src_dir)
 
 from patchcore.common import NetworkFeatureAggregator
 from patchcore.datasets.monuseg import MoNuSegDataset

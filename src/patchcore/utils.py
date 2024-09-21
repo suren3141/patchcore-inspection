@@ -82,6 +82,7 @@ def save_anomaly_scores(
     savefolder,
     image_paths,
     anomaly_scores=None,
+    out_file_name="scores.json"
 ):
     """Save anomaly scares.
 
@@ -98,7 +99,7 @@ def save_anomaly_scores(
         image_path : float(anomaly_score) for image_path, anomaly_score in zip(image_paths, anomaly_scores)
     }
 
-    with open(os.path.join(savefolder, "scores.json"), "w+") as f:
+    with open(os.path.join(savefolder, out_file_name), "w+") as f:
         json.dump(score_dict, f, indent=4)
 
 

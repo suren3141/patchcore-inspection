@@ -33,7 +33,7 @@ def test_pytorch(assertion=False):
 def objective(config, default_params=None):
 
     os.environ["PYTHONPATH"] = module_path
-    # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
     # print(config)
 
@@ -42,13 +42,25 @@ def objective(config, default_params=None):
     percentage = config["sampler_percentage"]
     ps = config["patchcore_patchsize"]
 
+    params = default_params
+
+    model_name = params["patchcore_params"]["backbone_names"][0]
+
+    if model_name == "optimus":
+        model_name = "OPT"
+    elif model_name == "medsam":
+        model_name = "SAM"
+    elif model_name == "wideresnet50":
+        model_name = "WR50"
+    else:
+        raise NotImplementedError
+
     # print(default_params)
 
-    params = default_params
 
     params["sampler_params"]["percentage"] = percentage
     params["patchcore_params"]["patchsize"] = ps
-    params["run_params"]["log_group"] = f"IM224_OPT_P{percentage:.1e}_D1024-1024_PS-{ps}_AN-1_S0"
+    params["run_params"]["log_group"] = f"IM224_{model_name}_P{percentage:.1e}_D1024-1024_PS-{ps}_AN-1_S0"
 
     out_path = os.path.join(params["run_params"]["results_path"], params["run_params"]["log_project"], params["run_params"]["log_group"])
     print(out_path)
@@ -70,6 +82,8 @@ def params_to_config_train(params):
     from run_patchcore import dataset, patch_core, sampler, run
 
     config = params["run_params"]
+
+    config["methods"] = []
 
     k, v = dataset.callback(**params["dataset_params"])
     config["methods"].append((k, v))
@@ -140,8 +154,10 @@ def test_hyperparam(default_params):
 def get_default_params():
 
     patchcore_params = dict(
-        backbone_names=["optimus"],
-        layers_to_extract_from=["out"],
+        # -b wideresnet50 -le layer2 -le layer3
+        # -b medsam -le out
+        backbone_names=["wideresnet50"],
+        layers_to_extract_from=["layer2", "layer3"],
         # Parameters for Glue-code (to merge different parts of the pipeline.
         pretrain_embed_dimension=1024,
         target_embed_dimension=1024,
@@ -162,7 +178,7 @@ def get_default_params():
     dataset_params = dict(
         name = "monuseg",
         data_path = "/workspace/patchcore-inspection/monuseg",
-        subdatasets = ['v1.2'],
+        subdatasets = ['v1.3'],
         train_val_split = 1,
         batch_size = 2,
         num_workers = 8,
@@ -182,7 +198,7 @@ def get_default_params():
         seed = 0,
         # log_group = "IM224_SAM_P01_D1024-1024_PS-5_ST-2_AN-1_S0",
         log_group = "temp",
-        log_project = "monuseg_hyperparam_v1.1",
+        log_project = "monuseg_hyperparam_v1.2",
         save_segmentation_images = False,
         save_patchcore_model = True,
         methods = [],
@@ -205,8 +221,8 @@ if __name__ == "__main__":
     # test_hyperparam(default_params)
 
     search_space = dict(
-        sampler_percentage = tune.grid_search([1e-3]),
-        patchcore_patchsize = tune.choice([11, 5, 19]),
+        sampler_percentage = tune.grid_search([1e-4, 1e-3, 1e-2]),
+        patchcore_patchsize = tune.choice([5, 11, 19]),
         # patchcore_patchsize = tune.choice([7]),
     )
 
@@ -215,7 +231,7 @@ if __name__ == "__main__":
 
     objective_fn = partial(objective, default_params=default_params)
 
-    resources={"gpu":.5}
+    # resources={"gpu":.5}
 
     tuner = tune.Tuner(
         tune.with_resources(
@@ -233,7 +249,6 @@ if __name__ == "__main__":
                 failure_config=train.FailureConfig(max_failures=10),
         ),
     )
-
 
 
     results = tuner.fit()

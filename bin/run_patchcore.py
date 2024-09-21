@@ -80,6 +80,7 @@ def run(
         patchcore.utils.fix_seeds(seed, device)
 
         dataset_name = dataloaders["training"].name
+        print("Training samples = ", len(dataloaders["training"].dataset))
         with device_context:
             torch.cuda.empty_cache()
             imagesize = dataloaders["training"].dataset.imagesize

@@ -69,6 +69,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
         patchcore.utils.fix_seeds(seed, device)
 
         dataset_name = dataloaders["testing"].name
+        print("Test samples = ", len(dataloaders["testing"].dataset))
 
         with device_context:
 

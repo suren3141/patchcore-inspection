@@ -15,9 +15,12 @@ from functools import partial
 from pprint import pprint
 
 import os, sys
-module_path = "/workspace/patchcore-inspection/src"
-sys.path.append(module_path)
-os.environ["PYTHONPATH"] = module_path
+from pathlib import Path
+file_path =  Path(__file__).absolute()
+src_dir = os.path.join(file_path.parents[1], 'src')
+import sys
+sys.path.append(src_dir)
+os.environ["PYTHONPATH"] = src_dir
 # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 
@@ -32,7 +35,7 @@ def test_pytorch(assertion=False):
 
 def objective(config, default_params=None):
 
-    os.environ["PYTHONPATH"] = module_path
+    os.environ["PYTHONPATH"] = src_dir
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
     # print(config)

@@ -1,8 +1,13 @@
 import sys, os
 
 # TODO : Change absolute path
-sys.path.append('/workspace/patchcore-inspection/src')
-sys.path.append('/workspace/patchcore-inspection/')
+from pathlib import Path
+file_path =  Path(__file__).absolute()
+src_dir = os.path.join(file_path.parents[1], 'src')
+
+import sys
+sys.path.append(src_dir)
+sys.path.append('/workspace/patchcore-inspection')
 from patchcore.datasets.monuseg import get_monuseg_images, MoNuSegDataset
 
 from feature_extractor.utils import extract_features

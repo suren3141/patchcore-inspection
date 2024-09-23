@@ -16,6 +16,8 @@ import patchcore.patchcore
 import patchcore.sampler
 import patchcore.utils
 
+from utils import _save_segmentation_images
+
 LOGGER = logging.getLogger(__name__)
 
 _DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"], 
@@ -98,18 +100,22 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
             scores = np.mean(scores, axis=0)
 
             segmentations = np.array(aggregator["segmentations"])
-            min_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .min(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            max_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .max(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            segmentations = (segmentations - min_scores) / (max_scores - min_scores)
-            segmentations = np.mean(segmentations, axis=0)
+            predicted_segmentation_maps = segmentations.any()
+
+            if predicted_segmentation_maps:
+
+                min_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .min(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                max_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .max(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                segmentations = (segmentations - min_scores) / (max_scores - min_scores)
+                segmentations = np.mean(segmentations, axis=0)
 
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
@@ -122,46 +128,27 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
                     x[2] for x in dataloaders["testing"].dataset.data_to_iterate
                 ]
 
+                # Save normalized scores
                 patchcore.utils.save_anomaly_scores(
                     results_path,
                     image_paths,
                     scores,
                 )
 
+                # Un-normalized scores
+                scores_raw = np.array(aggregator["scores"])
+                patchcore.utils.save_anomaly_scores(
+                    results_path,
+                    image_paths,
+                    scores_raw,
+                    out_file_name="scores_raw.json"
+                )
+
+
 
             # Plot Example Images.
             if save_segmentation_images:
-                image_paths = [
-                    x[2] for x in dataloaders["testing"].dataset.data_to_iterate
-                ]
-                mask_paths = [
-                    x[3] for x in dataloaders["testing"].dataset.data_to_iterate
-                ]
-
-                def image_transform(image):
-                    in_std = np.array(
-                        dataloaders["testing"].dataset.transform_std
-                    ).reshape(-1, 1, 1)
-                    in_mean = np.array(
-                        dataloaders["testing"].dataset.transform_mean
-                    ).reshape(-1, 1, 1)
-                    image = dataloaders["testing"].dataset.transform_img(image)
-                    return np.clip(
-                        (image.numpy() * in_std + in_mean) * 255, 0, 255
-                    ).astype(np.uint8)
-
-                def mask_transform(mask):
-                    return dataloaders["testing"].dataset.transform_mask(mask).numpy()
-
-                patchcore.utils.plot_segmentation_images(
-                    results_path,
-                    image_paths,
-                    segmentations,
-                    scores,
-                    mask_paths,
-                    image_transform=image_transform,
-                    mask_transform=mask_transform,
-                )
+                _save_segmentation_images(results_path, dataloaders["testing"], segmentations, scores)
 
             LOGGER.info("Computing evaluation metrics.")
 

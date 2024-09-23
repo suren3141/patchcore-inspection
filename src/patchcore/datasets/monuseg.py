@@ -258,7 +258,7 @@ def get_monuseg_dataloader(data_path, batch_size=1, split="", cropsize=224, resi
 
     if split == "test":
 
-        data_dirs = ["test/gt", "test/syn/v1.2_*/samples/", "test/syn/v1.3_*/samples/"]
+        data_dirs = ["train/gt", "test/gt", "test/syn/v1.2_*/samples/", "test/syn/v1.3_*/samples/", "test/syn/v1.4_*/samples/"]
 
         images = get_monuseg_images(data_path, data_dirs, subsample=subsample)
         

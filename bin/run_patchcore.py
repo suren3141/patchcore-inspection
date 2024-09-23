@@ -9,6 +9,8 @@ import torch
 
 sys.path.append('./src')
 
+from utils import _save_segmentation_images
+
 import feature_extractor.utils
 
 import patchcore.backbones
@@ -164,42 +166,7 @@ def run(
 
             # (Optional) Plot example images.
             if save_segmentation_images and predicted_segmentation_maps:
-                image_paths = [
-                    x[2] for x in dataloaders["testing"].dataset.data_to_iterate
-                ]
-                mask_paths = [
-                    x[3] for x in dataloaders["testing"].dataset.data_to_iterate
-                ]
-
-                def image_transform(image):
-                    in_std = np.array(
-                        dataloaders["testing"].dataset.transform_std
-                    ).reshape(-1, 1, 1)
-                    in_mean = np.array(
-                        dataloaders["testing"].dataset.transform_mean
-                    ).reshape(-1, 1, 1)
-                    image = dataloaders["testing"].dataset.transform_img(image)
-                    return np.clip(
-                        (image.numpy() * in_std + in_mean) * 255, 0, 255
-                    ).astype(np.uint8)
-
-                def mask_transform(mask):
-                    return dataloaders["testing"].dataset.transform_mask(mask).numpy()
-
-                image_save_path = os.path.join(
-                    run_save_path, "segmentation_images", dataset_name
-                )
-                os.makedirs(image_save_path, exist_ok=True)
-                patchcore.utils.plot_segmentation_images(
-                    image_save_path,
-                    image_paths,
-                    segmentations,
-                    scores,
-                    anomaly_labels,
-                    mask_paths,
-                    image_transform=image_transform,
-                    mask_transform=mask_transform,
-                )
+                _save_segmentation_images(run_save_path, dataloaders["testing"], segmentations, scores)
 
             LOGGER.info("Computing evaluation metrics.")
             auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(

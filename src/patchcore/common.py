@@ -230,6 +230,7 @@ class NetworkFeatureAggregator(torch.nn.Module):
             self.backbone.hook_handles = []
         for handle in self.backbone.hook_handles:
             handle.remove()
+
         self.outputs = {}
 
         if self.backbone.name in "optimus":

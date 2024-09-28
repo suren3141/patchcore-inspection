@@ -17,6 +17,11 @@ import numpy as np
 import torch
 from typing import List
 
+from sklearn.preprocessing import StandardScaler
+import umap
+from sklearn.decomposition import PCA  
+from pprint import pprint
+
 def get_optimus_backbone(seed):
     from feature_extractor.optimus import load_optimus
 
@@ -48,7 +53,7 @@ def get_medsam_backbone(seed, model_weights_path = "/mnt/dataset/medsam/medsam_v
     return backbone
 
 
-def get_backbone(backbone_name, backbone_seed=None):
+def get_backbone(backbone_name, backbone_seed=None, verbose=False):
 
     if backbone_name == "optimus":
         backbone = get_optimus_backbone(backbone_seed)
@@ -78,8 +83,8 @@ def get_backbone(backbone_name, backbone_seed=None):
         weights = ResNet18_Weights.DEFAULT
         backbone = resnet18(weights=weights)
         backbone.name, backbone.seed = backbone_name, backbone_seed
-        backbone.transforms = weights.transforms()
-        print(backbone.transforms)
+        # backbone.transforms = weights.transforms()
+
 
     else:
         import sys
@@ -88,6 +93,9 @@ def get_backbone(backbone_name, backbone_seed=None):
 
         backbone = patchcore.backbones.load(backbone_name)
         backbone.name, backbone.seed = backbone_name, backbone_seed
+
+    if verbose:
+        pprint(backbone)
 
     return backbone
 
@@ -123,6 +131,8 @@ def compute_features(dataloader, feature_aggregator, layers, device, flat=True):
 
     for layer in layers:
         features_dict[layer] = np.concatenate(features_dict[layer], axis=0)
+
+    return features_dict
 
 
 def extract_features(
@@ -163,3 +173,30 @@ def extract_features(
 
 
     return features_dict
+
+
+def reduce_features(train_features, val_features, emb_transform="umap", emb_kwargs=None):
+
+    if emb_transform == "ss":
+        reducer = StandardScaler()
+
+    elif emb_transform == "umap":
+        reducer = umap.UMAP(
+            # n_neighbors=30,
+            # min_dist=0.0, 
+            **emb_kwargs
+        )
+        
+
+    elif emb_transform == "pca":
+        reducer = PCA(**emb_kwargs)
+
+    else:
+        raise NotImplementedError()
+    
+    scaled_train_features = reducer.fit_transform(train_features)
+    scaled_val_features = None if val_features is None else reducer.transform(val_features)
+
+
+    return scaled_train_features, scaled_val_features, reducer
+

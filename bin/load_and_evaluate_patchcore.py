@@ -136,7 +136,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly
                 )
 
                 # Un-normalized scores
-                scores_raw = np.array(aggregator["scores"])
+                scores_raw = np.array(aggregator["scores"]).flatten()
                 patchcore.utils.save_anomaly_scores(
                     results_path,
                     image_paths,

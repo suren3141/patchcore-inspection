@@ -18,7 +18,6 @@ import pandas as pd
 # sys.path.insert(0, parentdir) 
 
 # from torchvision.io import read_image
-from torchvision.models import resnet50, ResNet50_Weights, resnet18, ResNet18_Weights
 from torchvision.models import resnet101, ResNet101_Weights
 import torch
 from torch import nn, tensor
@@ -235,6 +234,7 @@ def cluster_to_json(file_names, labels, out_path, json_name):
     with open(out_file, "w+") as f:
         json.dump({"images":img_dic, "bin_masks":mask_dic}, f)
 
+"""
 if __name__ == "__main__":
     # PREPROCESS = "color_rand"
     PREPROCESS = "_"
@@ -389,3 +389,4 @@ if __name__ == "__main__":
             with open(os.path.join(out_path, "exp.json"), "w+") as f:
                 json.dump(exp_out, f)
 
+"""

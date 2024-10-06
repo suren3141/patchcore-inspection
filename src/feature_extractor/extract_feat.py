@@ -31,10 +31,10 @@ if __name__ == "__main__":
     args = get_args()
 
     backbone = args.backbone
-    # backbone = "medsam"
-    # backbone = "optimus_old"
-    # backbone = "resnet50"
     # backbone = "optimus"
+    # backbone = "optimus_old"
+    # backbone = "medsam"
+    # backbone = "ResNet50"
 
     layer = args.layer
 
@@ -44,23 +44,19 @@ if __name__ == "__main__":
     #     "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_train_shuffle_model_*/samples"        
     # ]
 
-    # syn_dir_list = []
-    # for k in syn_dirs:
-    #     lis = glob(k)
-    #     print(lis)
 
+
+    input_output_map = { k : f"{k.rstrip('/')}_feat_{backbone}.json" for k in args.dirs}
+
+    """ 
+    To manually add directories with wildcards use this variable. 
+    Use this dictionary with format {key : value}, where key is the path to images folder, and value is the destination .json file
+    """
     # input_output_map = {
     #     "/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTrainingData/images" : f"/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTrainingData/images_feat_{backbone}.json",
     #     "/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTest/images" : f"/mnt/dataset/MoNuSeg/patches_valid_inst_128x128_128x128/MoNuSegTest/images_feat_{backbone}.json",
     #     "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/v1.3*/images" : "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/v1.3_feat_{backbone}.json"
     # }
-
-
-    # input_output_map = {
-    #     "/mnt/dataset/MoNuSeg/out_sdm_128x128/patches_valid_128.32CH_1000st_1e-4lr_8bs_hvb_col_cos_clus6/output_model_s1.2_020000/"
-    # }
-
-    input_output_map = { k : f"{k.rstrip('/')}_feat_{backbone}.json" for k in args.dirs}
 
     for (data_dir, out_json) in input_output_map.items():
 
@@ -84,28 +80,6 @@ if __name__ == "__main__":
         with open(out_json, 'w+') as f:
             json.dump(feat_json, f)
         
-
-
-
-# embedding_path = os.path.join('./logs_clustered/MoNuSeg/patches_valid_inst_128x128_128x128', f"{PREPROCESS}_{EMB_MODEL_NAME}")
-
-# features_dict = {}
-
-# for k, v in images.items():
-#     feat_path = k + f"_feat_{backbone}.json"
-#     if os.path.exists(feat_path):
-#         with open(feat_path, 'r') as f:
-#             feat_json = json.load(f)
-
-#             opt_feat_flat = [feat_json[i] for i in v]
-#             opt_feat_flat = np.array(list(opt_feat_flat))  
-
-#             print(feat_path, opt_feat_flat.shape)        
-
-#             features_dict[k] = opt_feat_flat
-
-#     else:
-#         raise NotImplementedError
 
 
 

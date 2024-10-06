@@ -25,7 +25,7 @@ Additionally, this could also be used for synthetic images, and wildcard folder 
 
 
 ## Main Results
-
+<!--
 Results on the TUMTraf cooperative **validation set**. The FPS is evaluated on a single RTX3080 GPU.
 
 ### Evaluation Results of CMTCoop model on TUMTraf Cooperative Dataset Test Set
@@ -49,6 +49,7 @@ Coop. Camera      5.6 22358 MiB 4523 MiB
 Coop. LiDAR      9.8 7352MiB 2293 MiB
 Coop. Cam+LiDAR      -->
 
+<!--
 ### Evaluation Results of Infrastructure-only models on TUMTraf Intersection Dataset Test Set
 
 | Model        | FOV    | Modality | mAP<sub>3D</sub> Easy | mAP<sub>3D</sub> Mod. | mAP<sub>3D</sub> Hard | mAP<sub>3D</sub> Avg. |
@@ -78,6 +79,7 @@ InfraDet3D south 2 Cam+LiDAR 58.38 19.73 33.08 37.06
 BEVFusionCoop south 2 Cam+LiDAR 74.73 53.46 41.96 66.89
 CMTCoop south 2 Cam+LiDAR 78.92 52.67 39.76 67.21 -->
 
+<!--
 ### Visualization
 
 #### Performance of Vehicular only model (CMT) from infrastructure perspective (left) and vehicular perspective (right)
@@ -107,6 +109,7 @@ Results on nuScenes **test set**. To reproduce our result, replace `ann_file=dat
 | [voxel0075](./projects/configs/lidar/cmt_lidar_voxel0075_cbgs.py) |L| 65.3% | 70.1%    | 15e+5e | 18.1 | 
 | [voxel0075_vov_1600x640](./projects/configs/fusion/cmt_voxel0075_vov_1600x640_cbgs.py)  |C+L| 72.0% | **74.1%**    | 15e+5e | 6.4 | -->
 
+<!--
 ## Resource
 
 Refer the following links for other resources related to this project:
@@ -116,6 +119,7 @@ Refer the following links for other resources related to this project:
 
 ## Citation
 Please consider citing the original work on CMT if you find this work helpful.
+-->
 
 <!-- ## Citation
 If you find CMT helpful in your research, please consider citing: 

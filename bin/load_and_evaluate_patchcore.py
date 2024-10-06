@@ -8,15 +8,20 @@ import click
 import numpy as np
 import torch
 
+sys.path.append('./src')
+
 import patchcore.common
 import patchcore.metrics
 import patchcore.patchcore
 import patchcore.sampler
 import patchcore.utils
 
+from utils import _save_segmentation_images
+
 LOGGER = logging.getLogger(__name__)
 
-_DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"]}
+_DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"], 
+             "monuseg": ["patchcore.datasets.mvtec", "MVTecDataset"]}
 
 
 @click.group(chain=True)
@@ -24,12 +29,13 @@ _DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"]}
 @click.option("--gpu", type=int, default=[0], multiple=True, show_default=True)
 @click.option("--seed", type=int, default=0, show_default=True)
 @click.option("--save_segmentation_images", is_flag=True)
+@click.option("--save_anomaly_scores", is_flag=True)
 def main(**kwargs):
     pass
 
 
 @main.result_callback()
-def run(methods, results_path, gpu, seed, save_segmentation_images):
+def run(methods, results_path, gpu, seed, save_segmentation_images, save_anomaly_scores):
     methods = {key: item for (key, item) in methods}
 
     os.makedirs(results_path, exist_ok=True)
@@ -65,6 +71,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
         patchcore.utils.fix_seeds(seed, device)
 
         dataset_name = dataloaders["testing"].name
+        print("Test samples = ", len(dataloaders["testing"].dataset))
 
         with device_context:
 
@@ -93,87 +100,61 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
             scores = np.mean(scores, axis=0)
 
             segmentations = np.array(aggregator["segmentations"])
-            min_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .min(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            max_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .max(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            segmentations = (segmentations - min_scores) / (max_scores - min_scores)
-            segmentations = np.mean(segmentations, axis=0)
+            predicted_segmentation_maps = segmentations.any()
+
+            if predicted_segmentation_maps:
+
+                min_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .min(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                max_scores = (
+                    segmentations.reshape(len(segmentations), -1)
+                    .max(axis=-1)
+                    .reshape(-1, 1, 1, 1)
+                )
+                segmentations = (segmentations - min_scores) / (max_scores - min_scores)
+                segmentations = np.mean(segmentations, axis=0)
 
             anomaly_labels = [
                 x[1] != "good" for x in dataloaders["testing"].dataset.data_to_iterate
             ]
 
-            # Plot Example Images.
-            if save_segmentation_images:
+            # Save anomaly scores in json.
+            if save_anomaly_scores:
+
                 image_paths = [
                     x[2] for x in dataloaders["testing"].dataset.data_to_iterate
                 ]
-                mask_paths = [
-                    x[3] for x in dataloaders["testing"].dataset.data_to_iterate
-                ]
 
-                def image_transform(image):
-                    in_std = np.array(
-                        dataloaders["testing"].dataset.transform_std
-                    ).reshape(-1, 1, 1)
-                    in_mean = np.array(
-                        dataloaders["testing"].dataset.transform_mean
-                    ).reshape(-1, 1, 1)
-                    image = dataloaders["testing"].dataset.transform_img(image)
-                    return np.clip(
-                        (image.numpy() * in_std + in_mean) * 255, 0, 255
-                    ).astype(np.uint8)
-
-                def mask_transform(mask):
-                    return dataloaders["testing"].dataset.transform_mask(mask).numpy()
-
-                patchcore.utils.plot_segmentation_images(
+                # Save normalized scores
+                patchcore.utils.save_anomaly_scores(
                     results_path,
                     image_paths,
-                    segmentations,
                     scores,
-                    mask_paths,
-                    image_transform=image_transform,
-                    mask_transform=mask_transform,
                 )
 
+                # Un-normalized scores
+                scores_raw = np.array(aggregator["scores"]).flatten()
+                patchcore.utils.save_anomaly_scores(
+                    results_path,
+                    image_paths,
+                    scores_raw,
+                    out_file_name="scores_raw.json"
+                )
+
+
+
+            # Plot Example Images.
+            if save_segmentation_images:
+                _save_segmentation_images(results_path, dataloaders["testing"], segmentations, scores)
+
             LOGGER.info("Computing evaluation metrics.")
-            # Compute Image-level AUROC scores for all images.
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
-                scores, anomaly_labels
-            )["auroc"]
 
-            # Compute PRO score & PW Auroc for all images
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                segmentations, masks_gt
-            )
-            full_pixel_auroc = pixel_scores["auroc"]
+            results_dict = get_eval_metrics(scores, anomaly_labels, segmentations, masks_gt, dataset_name)
 
-            # Compute PRO score & PW Auroc only for images with anomalies
-            sel_idxs = []
-            for i in range(len(masks_gt)):
-                if np.sum(masks_gt[i]) > 0:
-                    sel_idxs.append(i)
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                [segmentations[i] for i in sel_idxs], [masks_gt[i] for i in sel_idxs]
-            )
-            anomaly_pixel_auroc = pixel_scores["auroc"]
-
-            result_collect.append(
-                {
-                    "dataset_name": dataset_name,
-                    "instance_auroc": auroc,
-                    "full_pixel_auroc": full_pixel_auroc,
-                    "anomaly_pixel_auroc": anomaly_pixel_auroc,
-                }
-            )
+            result_collect.append(results_dict)
 
             for key, item in result_collect[-1].items():
                 if key != "dataset_name":
@@ -193,6 +174,52 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
         column_names=result_metric_names,
         row_names=result_dataset_names,
     )
+
+    # Hyperparameter optimization runs out of memory if not cleared.
+    torch.cuda.empty_cache()
+
+    return result_collect
+
+def get_eval_metrics(scores, anomaly_labels, segmentations, masks_gt, dataset_name):
+    # Compute Image-level AUROC scores for all images.
+    auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
+        scores, anomaly_labels
+    )["auroc"]
+
+    predicted_segmentation_maps = segmentations.any()
+
+    # Compute PRO score & PW Auroc for all images
+    if len(masks_gt) > 0 and predicted_segmentation_maps:
+        pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+            segmentations, masks_gt
+        )
+        full_pixel_auroc = pixel_scores["auroc"]
+    else:
+        full_pixel_auroc = np.nan
+
+    # Compute PRO score & PW Auroc only images with anomalies
+    if len(masks_gt) > 0 and predicted_segmentation_maps:
+        sel_idxs = []
+        for i in range(len(masks_gt)):
+            if np.sum(masks_gt[i]) > 0:
+                sel_idxs.append(i)
+        pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+            [segmentations[i] for i in sel_idxs],
+            [masks_gt[i] for i in sel_idxs],
+        )
+        anomaly_pixel_auroc = pixel_scores["auroc"]
+    else:
+        anomaly_pixel_auroc = np.nan
+    
+    results_dict = {
+        "dataset_name": dataset_name,
+        "instance_auroc": auroc,
+        "full_pixel_auroc": full_pixel_auroc,
+        "anomaly_pixel_auroc": anomaly_pixel_auroc,
+    }
+
+    return results_dict
+
 
 
 @main.command("patch_core_loader")
@@ -239,43 +266,59 @@ def patch_core_loader(patch_core_paths, faiss_on_gpu, faiss_num_workers):
 @click.argument("name", type=str)
 @click.argument("data_path", type=click.Path(exists=True, file_okay=False))
 @click.option("--subdatasets", "-d", multiple=True, type=str, required=True)
+@click.option("--subsample", type=float, required=False)
 @click.option("--batch_size", default=1, type=int, show_default=True)
 @click.option("--num_workers", default=8, type=int, show_default=True)
 @click.option("--resize", default=256, type=int, show_default=True)
 @click.option("--imagesize", default=224, type=int, show_default=True)
 @click.option("--augment", is_flag=True)
 def dataset(
-    name, data_path, subdatasets, batch_size, resize, imagesize, num_workers, augment
+    name, data_path, subdatasets, subsample, batch_size, resize, imagesize, num_workers, augment
 ):
     dataset_info = _DATASETS[name]
     dataset_library = __import__(dataset_info[0], fromlist=[dataset_info[1]])
 
-    def get_dataloaders_iter(seed):
-        for subdataset in subdatasets:
-            test_dataset = dataset_library.__dict__[dataset_info[1]](
-                data_path,
-                classname=subdataset,
-                resize=resize,
-                imagesize=imagesize,
-                split=dataset_library.DatasetSplit.TEST,
-                seed=seed,
-            )
+    if name == "monuseg":
+        def get_dataloaders_iter(seed):
+            from patchcore.datasets.monuseg import get_monuseg_dataloader
 
-            test_dataloader = torch.utils.data.DataLoader(
-                test_dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=num_workers,
-                pin_memory=True,
-            )
+            for subdataset in subdatasets:
 
-            test_dataloader.name = name
-            if subdataset is not None:
-                test_dataloader.name += "_" + subdataset
+                test_dataloader = get_monuseg_dataloader(data_path, batch_size=batch_size, split=dataset_library.DatasetSplit.TEST.value, resize=resize, cropsize=imagesize, subsample=subsample)
 
-            dataloader_dict = {"testing": test_dataloader}
+                test_dataloader.name = name
 
-            yield dataloader_dict
+                dataloader_dict = {"testing": test_dataloader}
+
+                yield dataloader_dict
+
+    else:
+        def get_dataloaders_iter(seed):
+            for subdataset in subdatasets:
+                test_dataset = dataset_library.__dict__[dataset_info[1]](
+                    data_path,
+                    classname=subdataset,
+                    resize=resize,
+                    imagesize=imagesize,
+                    split=dataset_library.DatasetSplit.TEST,
+                    seed=seed,
+                )
+
+                test_dataloader = torch.utils.data.DataLoader(
+                    test_dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=num_workers,
+                    pin_memory=True,
+                )
+
+                test_dataloader.name = name
+                if subdataset is not None:
+                    test_dataloader.name += "_" + subdataset
+
+                dataloader_dict = {"testing": test_dataloader}
+
+                yield dataloader_dict
 
     return ("get_dataloaders_iter", [get_dataloaders_iter, len(subdatasets)])
 

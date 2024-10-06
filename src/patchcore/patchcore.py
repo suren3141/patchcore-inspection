@@ -8,10 +8,16 @@ import torch
 import torch.nn.functional as F
 import tqdm
 
+import sys
+sys.path.append('./src')
+
+import feature_extractor.utils
+
 import patchcore
 import patchcore.backbones
 import patchcore.common
 import patchcore.sampler
+import patchcore.utils 
 
 LOGGER = logging.getLogger(__name__)
 
@@ -175,12 +181,12 @@ class PatchCore(torch.nn.Module):
 
         self.anomaly_scorer.fit(detection_features=[features])
 
-    def predict(self, data):
+    def predict(self, data, get_mask=True):
         if isinstance(data, torch.utils.data.DataLoader):
-            return self._predict_dataloader(data)
-        return self._predict(data)
+            return self._predict_dataloader(data, get_mask=get_mask)
+        return self._predict(data, get_mask=get_mask)
 
-    def _predict_dataloader(self, dataloader):
+    def _predict_dataloader(self, dataloader, get_mask=True):
         """This function provides anomaly scores/maps for full dataloaders."""
         _ = self.forward_modules.eval()
 
@@ -194,13 +200,13 @@ class PatchCore(torch.nn.Module):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
-                _scores, _masks = self._predict(image)
+                _scores, _masks = self._predict(image, get_mask=get_mask)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
                     masks.append(mask)
         return scores, masks, labels_gt, masks_gt
 
-    def _predict(self, images):
+    def _predict(self, images, get_mask=True):
         """Infer score and mask for a batch of images."""
         images = images.to(torch.float).to(self.device)
         _ = self.forward_modules.eval()
@@ -217,13 +223,16 @@ class PatchCore(torch.nn.Module):
             image_scores = image_scores.reshape(*image_scores.shape[:2], -1)
             image_scores = self.patch_maker.score(image_scores)
 
-            patch_scores = self.patch_maker.unpatch_scores(
-                patch_scores, batchsize=batchsize
-            )
-            scales = patch_shapes[0]
-            patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
+            if get_mask:
+                patch_scores = self.patch_maker.unpatch_scores(
+                    patch_scores, batchsize=batchsize
+                )
+                scales = patch_shapes[0]
+                patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
 
-            masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
+                masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
+            else:
+                masks = [None] * len(patch_scores)
 
         return [score for score in image_scores], [mask for mask in masks]
 
@@ -263,9 +272,12 @@ class PatchCore(torch.nn.Module):
         LOGGER.info("Loading and initializing PatchCore.")
         with open(self._params_file(load_path, prepend), "rb") as load_file:
             patchcore_params = pickle.load(load_file)
-        patchcore_params["backbone"] = patchcore.backbones.load(
-            patchcore_params["backbone.name"]
-        )
+
+        # patchcore_params["backbone"] = patchcore.backbones.load(
+        #     patchcore_params["backbone.name"]
+        # )
+
+        patchcore_params["backbone"] = feature_extractor.utils.get_backbone(patchcore_params["backbone.name"])
         patchcore_params["backbone"].name = patchcore_params["backbone.name"]
         del patchcore_params["backbone.name"]
         self.load(**patchcore_params, device=device, nn_method=nn_method)

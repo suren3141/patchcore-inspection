@@ -225,11 +225,27 @@ class NetworkFeatureAggregator(torch.nn.Module):
         self.layers_to_extract_from = layers_to_extract_from
         self.backbone = backbone
         self.device = device
+
         if not hasattr(backbone, "hook_handles"):
             self.backbone.hook_handles = []
         for handle in self.backbone.hook_handles:
             handle.remove()
+
         self.outputs = {}
+
+        if self.backbone.name in "optimus":
+            # self.backbone.head_drop = torch.nn.Identity()
+            # self.backbone.norm = torch.nn.Identity()
+            self.to(self.device)
+            return
+
+        if self.backbone.name == "medsam":
+            self.to(self.device)
+            return
+
+        if self.backbone.name == "inception_v3":
+            self.to(self.device)
+            return
 
         for extract_layer in layers_to_extract_from:
             forward_hook = ForwardHook(
@@ -257,7 +273,38 @@ class NetworkFeatureAggregator(torch.nn.Module):
         self.to(self.device)
 
     def forward(self, images):
+
         self.outputs.clear()
+
+        if self.backbone.name == "optimus":
+            with torch.inference_mode():
+                if hasattr(self.backbone, '_process_input'):    # optimus patch features
+                    features = self.backbone._process_input(images)
+                elif hasattr(self.backbone, 'forward_features'):    # optimus decoded features
+                    features = self.backbone.forward_features(images).mean(axis=1)
+                else:
+                    raise NotADirectoryError
+                # assert features.shape == (images.shape[0], 1536)
+                self.outputs['out'] = features
+            return self.outputs
+
+        if self.backbone.name == "medsam":
+            with torch.inference_mode():
+                # TODO : Update preporcess to remove normalization
+                images = self.backbone.preprocess(images)
+                features = self.backbone.image_encoder(images)
+                # assert features.shape == (images.shape[0], 1536)
+                self.outputs['out'] = features
+            return self.outputs
+
+        if self.backbone.name == "inception_v3":
+            with torch.inference_mode():
+                pred = self.backbone(images)[0]
+
+                #TODO : Choose adaptive average pooling or not
+                self.outputs['out'] = pred
+            return self.outputs
+
         with torch.no_grad():
             # The backbone will throw an Exception once it reached the last
             # layer to compute features from. Computation will stop there.

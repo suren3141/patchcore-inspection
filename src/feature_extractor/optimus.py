@@ -46,13 +46,18 @@ def load_optimus(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.pth",
         "in_chans": 3,
     }
 
-    model_h_optimus = timm.models.VisionTransformer(**params)
+    if os.path.exists(PATH_TO_CHECKPOINT):
 
-    # load state dict from checkpoint
-    checkpoint = torch.load(PATH_TO_CHECKPOINT, map_location="cpu")
-    # checkpoint = torch.load(PATH_TO_CHECKPOINT, weights_only=True)
+        model_h_optimus = timm.models.VisionTransformer(**params)
 
-    model_h_optimus.load_state_dict(checkpoint, strict=True)
+        # load state dict from checkpoint
+        checkpoint = torch.load(PATH_TO_CHECKPOINT, map_location="cpu")
+        # checkpoint = torch.load(PATH_TO_CHECKPOINT, weights_only=True)
+
+        model_h_optimus.load_state_dict(checkpoint, strict=True)
+    else:
+        model_h_optimus = timm.create_model("hf-hub:bioptimus/H-optimus-0", pretrained=True, init_values=1e-5, dynamic_img_size=False)
+
 
     def _process_input(self, x: torch.Tensor) -> torch.Tensor:
         x = self.patch_embed.proj(x)
@@ -91,8 +96,17 @@ def load_optimus_old(PATH_TO_CHECKPOINT = "/mnt/dataset/h_optimus_0/checkpoint.p
         'in_chans': 3
     }
 
-    model_h_optimus = timm.models.VisionTransformer(**params)
-    model_h_optimus.load_state_dict(torch.load(PATH_TO_CHECKPOINT, map_location="cpu"))
+    if os.path.exists(PATH_TO_CHECKPOINT):
+
+        model_h_optimus = timm.models.VisionTransformer(**params)
+
+        # load state dict from checkpoint
+        checkpoint = torch.load(PATH_TO_CHECKPOINT, map_location="cpu")
+        # checkpoint = torch.load(PATH_TO_CHECKPOINT, weights_only=True)
+
+        model_h_optimus.load_state_dict(checkpoint, strict=True)
+    else:
+        model_h_optimus = timm.create_model("hf-hub:bioptimus/H-optimus-0", pretrained=True, init_values=1e-5, dynamic_img_size=False)
 
     model_h_optimus.eval()
     model_h_optimus.to(device)

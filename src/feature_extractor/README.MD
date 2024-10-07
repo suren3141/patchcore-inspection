@@ -1,10 +1,8 @@
 # Feature extraction & Clustering
 
-This repository was made for the [MoNuSeg diffusion model](). This part of the code performs feature extraction, and clustering steps.
+This repository was made for the [MoNuSeg diffusion model](https://github.com/suren3141/semantic-diffusion-model). This part of the code performs feature extraction, and clustering steps.
 
-## Introduction
-
-
+<!-- ## Introduction -->
 ## Step-by-step instruction
 
 ### Data preparation

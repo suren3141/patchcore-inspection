@@ -230,6 +230,17 @@ import numpy as np
 import time
 from typing import List
 
+def get_monuseg_images_recursive(data_path : str):
+    files = []
+    for entry in os.listdir(data_path):
+        full_path = os.path.join(data_path, entry)
+        if os.path.isdir(full_path):
+            files += get_monuseg_images_recursive(full_path)
+        elif full_path.endswith('.png'):
+            files.append(full_path)
+
+    return files
+
 def get_monuseg_images(data_path : str, directories : List, subsample=None, verbose=False):
 
     images = []
@@ -258,12 +269,28 @@ def get_monuseg_dataloader(data_path, batch_size=1, split="", cropsize=224, resi
 
     if split == "test":
 
-        data_dirs = ["train/gt", "test/gt", "test/syn/v1.2_*/samples/", "test/syn/v1.3_*/samples/", "test/syn/v1.4_*/samples/"]
+        # data_dirs = ["train/gt", "test/gt", "test/syn/v1.2_*/samples/", "test/syn/v1.3_*/samples/", "test/syn/v1.4_*/samples/"]
+        # images = get_monuseg_images(data_path, data_dirs, subsample=subsample)
 
-        images = get_monuseg_images(data_path, data_dirs, subsample=subsample)
+        data_path = os.path.join(data_path, split, "gt")
+        images_gt = get_monuseg_images_recursive(data_path)
+
+        data_path = os.path.join(data_path, split, "syn")
+        images_syn = get_monuseg_images_recursive(data_path)
+
+        images = images_gt + images_syn
+
+        if subsample:
+            t = 1000 * time.time() # current time in milliseconds
+            np.random.seed(int(t) % 2**32)
+
+            images = list(np.random.choice(images, int(len(images)*subsample), replace=False))
+
         
     else:
-        images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
+        data_path = os.path.join(data_path, split, "gt")
+        # images = glob.glob(os.path.join(data_path, split, "gt", "*.png"))
+        images = get_monuseg_images_recursive(data_path)
 
     # TODO : Update this to take in only path (and not images)
     image_dataset = MoNuSegDataset(images, cropsize=cropsize, resize=resize)

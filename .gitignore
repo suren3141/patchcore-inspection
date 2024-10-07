@@ -6,3 +6,5 @@ results
 monuseg
 #src/feature_extractor/optimus.py
 src/feature_extractor/optimus_tmp.py
+temp
+*.egg-info/

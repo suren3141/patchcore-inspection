@@ -1,8 +1,109 @@
 # Detecting OOD synthetic H&E images
 
+This repository was made for the [MoNuSeg diffusion model](https://github.com/suren3141/semantic-diffusion-model). This part of the code performs OOD filtering steps.
+
 This repository is an extension of `PatchCore` as proposed in Roth et al. (2021), <https://arxiv.org/abs/2106.08265> applied for OOD detection of synthetic histopathological images.
 
-The ReadMe will be updated at the end of the project.
+## Step-by-step instruction
+
+### Data preparation
+
+Download the data following the instructions in the [MoNuSeg Dataset](https://github.com/suren3141/MoNuSegDataset) repository.
+
+Then create a new data directory in this project with the name `monuseg` with `train` and `test` subdirectories.
+The train directory should only have real images in a folder named `gt`. The test directory can contain real images in a folder `gt` and synthetic images in a folder `syn`.
+The images should be of `.png` format and can either be copied or soft linked.
+
+```
+monuseg
+├── train
+│   └── gt
+│       ├──img1.png
+│       ├──img2.png
+│       ├──
+│       ├──dir1
+│
+├── test
+    ├── gt
+    │   ├──img1.png
+    │   ├──img2.png
+    │   ├──
+    │   ├──dir2
+    │
+    └── syn
+        ├──dir3
+        ├──dir4
+        ├──dir5
+
+```
+
+### Installation
+
+Build the docker image and then run it as follows.
+
+```shell
+docker build -t patchcore -f Dockerfile .
+
+docker run --gpus all --rm -it -v $PATH_TO_DATASET:/mnt/dataset --name patchcore patchcore bash
+```
+
+Alternatively install the necessary packages manually without docker by using the [requirements](./requirements.txt) file.
+
+### Training
+
+To train the patchcore model with H-Optimus-0 backbone use the [run_patchcore](./bin/run_patchcore.py) script
+
+```shell
+python bin/run_patchcore.py 
+results \
+--gpu 0 --seed 0 \
+--save_patchcore_model \
+--log_group IM224_OPT_P01_D1024-1024_PS-3_AN-1_S0 --log_project MoNuSeg_Results \
+patch_core -b optimus -le out --faiss_on_gpu \
+--pretrain_embed_dimension 1024  --target_embed_dimension 1024 --anomaly_scorer_num_nn 1 --patchsize 3 \
+sampler -p 0.1 approx_greedy_coreset \
+dataset --resize 224 --imagesize 224 monuseg $PATH_TO_DATASET
+```
+
+`$PATH_TO_DATASET` refers to the folder that was created in the data preparation step with train adn test sets.
+
+Set the `--save_segmentation_images` flag to save sample output anomaly maps.
+
+Refer [sample_training.sh](./sample_training.sh) for other examples with different backbones.
+
+### Evaluation
+
+To evaluate on a pretrained model use the [load_and_evaluate_patchcore](./bin/load_and_evaluate_patchcore.py) script
+
+
+```shell
+python bin/load_and_evaluate_patchcore.py \
+$RESULTS_PATH --gpu 0 --seed 0 --save_anomaly_scores \
+patch_core_loader -p $MODEL_PATH --faiss_on_gpu \
+dataset --resize 224 --imagesize 224 monuseg $PATH_TO_TEST_SET
+```
+
+Set the `--save_segmentation_images` flag to save sample output anomaly maps.
+
+### Hyperparameter Tuning
+
+To Hyperparameter Tuning script is based on train and evaluation scripts. The model is trained on the training set once and evaluated on the test set multiple times. Use the  on a pretrained model use the [hyperparam_opt_patchcore](./bin/hyperparam_opt_patchcore.py) script
+
+### Visualization
+
+The anomaly scores for each set can be visualized using the [analysis.ipynb](./notebooks/analysis.ipynb) script. It also displays sample images with corresponding anomaly values.
+
+| OOD scores | Samples |
+|---------|----------|
+|![ood_cluster](images/ood_cluster.png)  | ![ood_image_samples](./images/ood_image_samples.png) |
+
+
+AUROC for hyperparameter tuning can be visualized using [hyperparam.ipynb](./notebooks/hyperparam.ipynb).
+
+![patchcore_hyperparam](./images/patchcore_hyperparam.png)
+
+
+
 
 
 <!-- It also provides various pretrained models that can achieve up to _99.6%_ image-level anomaly

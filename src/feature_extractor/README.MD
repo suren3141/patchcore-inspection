@@ -1,6 +1,6 @@
-# Feature extraction
+# Feature extraction & Clustering
 
-This repository was made for the [MoNuSeg diffusion model](). This part of the code performs feature extraction, and clustering steps are perform
+This repository was made for the [MoNuSeg diffusion model](). This part of the code performs feature extraction, and clustering steps.
 
 ## Introduction
 
@@ -21,10 +21,47 @@ python extract_feat.py --dirs $PATH_TO_TRAIN_IMAGES $PATH_TO_TEST_IMAGES --backb
 
 $PATH_TO_TRAIN_IMAGES and $PATH_TO_TEST_IMAGES refer to the images directory in the training and test sets. Extracted features are saved as json in the train and test folders.
 
-Additionally, this could also be used for synthetic images, and wildcard folder by referring to the comments in the script.
+Additionally, this could also be used for synthetic images, and wildcard folders by referring to the comments in the script.
+
+### Visualization
+
+To visualtize the extracted features, use the [visualize_feat.ipynb](./visualize_feat.ipynb) script.
+
+![visualize_feat](./visualize_feat.png)
+
+## Clustering
+
+To cluster the images using the extracted features, use the [cluster_embeddings.ipynb](../cluster/cluster_embeddings.ipynb) script.
+
+Clustering results vary highly for multiple runs. Therefore, choose the right variables in the script. 
+
+The final clustered model, the metrics, and the best clusters are saved in this script.
+
+The final clusters are saved as `.json` file. To convert this into a symlinks and generate the folder structure, run the `cluster.py` script.
+
+```bash
+python cluster.py --dirs $PATH_TO_JSON_DIR
+```
+
+where `$PATH_TO_JSON_DIR` contains the train.json and test.json files.
+
+![visualize_cluster](../cluster/visualize_cluster.png)
 
 
 ## Main Results
+
+The final metrics obtained from H-Optimus-0 feature extractor, UMAP feature reducer (with 5 components) and HDBScan clustering is listed below. 
+
+| Trial        | Silhoutte score |  DBCV  | Max. cluster size | Final cluster number |
+|--------------|-------------|----------------|----------------|--------------|
+|1 |0.513| 0.462| 0.350| 3/4|
+|2| 0.450| 0.212| 0.559| 2/3|
+|3| 0.431| 0.314| 0.559| 3/4|
+|4| 0.564| -0.185|  0.331| 3/4|
+|5| 0.145| 0.951| 0.849| 1/2|
+
+
+
 <!--
 Results on the TUMTraf cooperative **validation set**. The FPS is evaluated on a single RTX3080 GPU.
 

@@ -18,7 +18,7 @@ import pandas as pd
 # sys.path.insert(0, parentdir) 
 
 # from torchvision.io import read_image
-from torchvision.models import resnet101, ResNet101_Weights
+# from torchvision.models import resnet101, ResNet101_Weights
 import torch
 from torch import nn, tensor
 
